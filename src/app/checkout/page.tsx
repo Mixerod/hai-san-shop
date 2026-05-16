@@ -1,0 +1,340 @@
+'use client'
+
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useCart } from '@/store/cart'
+import { supabase } from '@/lib/supabase'
+import { 
+  Building2, 
+  Truck, 
+  Wallet, 
+  CreditCard, 
+  ChevronRight, 
+  ShoppingCart,
+  Loader2,
+  AlertCircle
+} from 'lucide-react'
+
+function CheckoutForm() {
+  const { items, total, clear } = useCart()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Đã giữ nguyên logic cũ
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
+  const [note, setNote] = useState(searchParams.get('note') || '')
+  const [session, setSession] = useState<any>(null)
+  
+  const totalKg = items.reduce((acc, item) => acc + item.quantity, 0)
+  
+  const [deliveryMethod, setDeliveryMethod] = useState<'company' | 'viettel'>('company')
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'transfer'>('cod')
+  
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [hasHydrated, setHasHydrated] = useState(false)
+
+  useEffect(() => {
+    setHasHydrated(true)
+    // Lấy session để gắn user_id vào đơn hàng → lịch sử mua hàng hoạt động
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      // Prefill tên/SĐT từ profile nếu đã đăng nhập
+      if (session?.user?.id) {
+        supabase.from('profiles').select('full_name, phone').eq('id', session.user.id).single()
+          .then(({ data }) => {
+            if (data?.full_name) setName(data.full_name)
+            if (data?.phone) setPhone(data.phone)
+          })
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (hasHydrated && items.length === 0) {
+      router.push('/products')
+    }
+  }, [items.length, router, hasHydrated])
+
+  if (!hasHydrated) return null
+  if (items.length === 0) return null
+
+  // Đã giữ nguyên logic cũ - handleSubmit Supabase insert
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const finalNote = `Tên: ${name}\nSĐT: ${phone}\nNhận hàng: ${deliveryMethod === 'company' ? 'Tại công ty' : `Viettel Post - ${address}`}\nGhi chú khách: ${note}`
+
+      // 1. Insert order — GẮN user_id để lịch sử mua hàng hiển thị đúng
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: session?.user?.id || null, // FIX: gắn user_id thay vì null cứng
+          status: 'pending',
+          payment_method: paymentMethod,
+          total_amount: total(),
+          note: finalNote
+        })
+        .select('id')
+        .single()
+
+      if (orderError || !order) {
+        throw new Error(orderError?.message || 'Không thể tạo đơn hàng, vui lòng thử lại.')
+      }
+
+      // 2. Insert order items
+      const orderItems = items.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        price_at_time: item.price
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems)
+
+      if (itemsError) throw itemsError
+
+      // 3. Clear cart & chuyển hướng
+      clear()
+      router.push(`/order-success?id=${order.id}`)
+
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="w-full flex flex-col items-center px-4 py-12">
+      <div className="w-full max-w-2xl">
+
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+            <ShoppingCart className="w-5 h-5 text-blue-600" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Thanh toán</h1>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* Order Summary */}
+          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+            <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
+              Đơn hàng của bạn
+            </h2>
+            <div className="space-y-4 mb-5">
+              {items.map((item) => (
+                <div key={item.id} className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-800">{item.name}</p>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      {item.quantity} {item.unit} × {item.price.toLocaleString('vi-VN')}đ
+                    </p>
+                  </div>
+                  <span className="font-bold text-slate-700 ml-4">
+                    {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-slate-100 pt-4 flex justify-between items-center">
+              <p className="text-slate-500 text-sm">Tổng cộng ({totalKg}kg)</p>
+              <p className="text-2xl font-black text-blue-600">
+                {total().toLocaleString('vi-VN')}đ
+              </p>
+            </div>
+          </section>
+
+          {/* Customer Info */}
+          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+            <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
+              Thông tin liên hệ
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">Họ tên <span className="text-red-500">*</span></label>
+                <input
+                  required
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-sm"
+                  placeholder="Vd: Lê Minh Quyết"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">Số điện thoại <span className="text-red-500">*</span></label>
+                <input
+                  required
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-sm"
+                  placeholder="09xx xxx xxx"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Delivery Method */}
+          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+            <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
+              Hình thức nhận hàng
+            </h2>
+            <div className="space-y-3">
+              <label className={`block border rounded-xl p-4 cursor-pointer transition-all duration-200 ${deliveryMethod === 'company' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                <input type="radio" name="delivery" className="hidden" checked={deliveryMethod === 'company'} onChange={() => setDeliveryMethod('company')} />
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${deliveryMethod === 'company' ? 'border-blue-500' : 'border-slate-300'}`}>
+                    {deliveryMethod === 'company' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                  </div>
+                  <Building2 className={`w-5 h-5 ${deliveryMethod === 'company' ? 'text-blue-600' : 'text-slate-400'}`} />
+                  <span className={`font-semibold text-sm ${deliveryMethod === 'company' ? 'text-blue-700' : 'text-slate-700'}`}>Nhận tại công ty</span>
+                </div>
+                <p className="text-sm text-slate-500 mt-2 ml-8">Phí ship ~5.000–10.000đ chia đều theo đơn chung, thu khi nhận hàng.</p>
+              </label>
+
+              {totalKg >= 5 && (
+                <label className={`block border rounded-xl p-4 cursor-pointer transition-all duration-200 ${deliveryMethod === 'viettel' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                  <input type="radio" name="delivery" className="hidden" checked={deliveryMethod === 'viettel'} onChange={() => setDeliveryMethod('viettel')} />
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${deliveryMethod === 'viettel' ? 'border-blue-500' : 'border-slate-300'}`}>
+                      {deliveryMethod === 'viettel' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                    </div>
+                    <Truck className={`w-5 h-5 ${deliveryMethod === 'viettel' ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <span className={`font-semibold text-sm ${deliveryMethod === 'viettel' ? 'text-blue-700' : 'text-slate-700'}`}>Giao tận nơi (Viettel Post)</span>
+                  </div>
+                  <p className="text-sm text-slate-500 mt-2 ml-8">Phí ship Viettel Post tính theo khoảng cách, liên hệ báo giá.</p>
+                  <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'viettel' ? 'max-h-32 mt-3' : 'max-h-0'}`}>
+                    <div className="ml-8">
+                      <input
+                        required={deliveryMethod === 'viettel'}
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Nhập địa chỉ giao hàng chi tiết..."
+                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-sm text-slate-800 placeholder-slate-400"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                </label>
+              )}
+            </div>
+          </section>
+
+          {/* Payment Method */}
+          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+            <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
+              Phương thức thanh toán
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={`border rounded-xl p-4 cursor-pointer transition-all flex items-center gap-3 ${paymentMethod === 'cod' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                <input type="radio" name="payment" value="cod" className="hidden" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${paymentMethod === 'cod' ? 'border-blue-500' : 'border-slate-300'}`}>
+                  {paymentMethod === 'cod' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                </div>
+                <Wallet className={`w-5 h-5 ${paymentMethod === 'cod' ? 'text-blue-600' : 'text-slate-400'}`} />
+                <span className={`font-semibold text-sm ${paymentMethod === 'cod' ? 'text-blue-700' : 'text-slate-700'}`}>Tiền mặt (COD)</span>
+              </label>
+
+              <label className={`border rounded-xl p-4 cursor-pointer transition-all flex items-center gap-3 ${paymentMethod === 'transfer' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                <input type="radio" name="payment" value="transfer" className="hidden" checked={paymentMethod === 'transfer'} onChange={() => setPaymentMethod('transfer')} />
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${paymentMethod === 'transfer' ? 'border-blue-500' : 'border-slate-300'}`}>
+                  {paymentMethod === 'transfer' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                </div>
+                <CreditCard className={`w-5 h-5 ${paymentMethod === 'transfer' ? 'text-blue-600' : 'text-slate-400'}`} />
+                <span className={`font-semibold text-sm ${paymentMethod === 'transfer' ? 'text-blue-700' : 'text-slate-700'}`}>Chuyển khoản</span>
+              </label>
+            </div>
+
+            {/* Bank details */}
+            <div className={`overflow-hidden transition-all duration-300 ${paymentMethod === 'transfer' ? 'max-h-64 mt-4' : 'max-h-0'}`}>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center">
+                <p className="text-sm text-slate-500 mb-3">Vui lòng chuyển khoản với thông tin:</p>
+                <div className="inline-block text-left bg-white rounded-lg p-4 mb-4 border border-slate-200">
+                  <p className="font-semibold text-base text-green-600">Agribank</p>
+                  <p className="font-mono text-xl tracking-wider text-slate-900 my-1">4801205175150</p>
+                  <p className="text-slate-700 font-semibold">LÊ MINH QUYẾT</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-100 py-2.5 px-4 rounded-lg inline-flex items-center justify-center gap-2">
+                  <span className="text-sm text-slate-600">Nội dung CK:</span>
+                  <span className="font-bold text-blue-600">{phone || '(Vui lòng nhập SĐT)'}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Notes */}
+          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+            <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+              Ghi chú thêm <span className="text-sm text-slate-400 font-normal ml-1">(Tùy chọn)</span>
+            </h2>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Giao ngoài giờ hành chính, để trước cửa..."
+              rows={3}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none transition-all text-sm"
+            />
+          </section>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-sm">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:scale-[0.98] disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 text-base"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Đang xử lý...</span>
+              </>
+            ) : (
+              <>
+                <span>Xác nhận đặt hàng</span>
+                <ChevronRight className="w-5 h-5" />
+              </>
+            )}
+          </button>
+
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="text-slate-500 font-medium">Đang tải...</p>
+      </div>
+    }>
+      <CheckoutForm />
+    </Suspense>
+  )
+}
