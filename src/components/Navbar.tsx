@@ -71,9 +71,9 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group shrink-0">
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100 group-hover:bg-blue-100 transition-colors">
-              <Anchor className="w-6 h-6 text-blue-600" />
+              <Anchor className="w-6 h-6 text-blue-800" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-blue-600 hidden sm:block">Hải Sản Sạch</span>
+            <span className="font-bold text-xl tracking-tight text-blue-800 hidden sm:block">Hải Sản Sạch</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -84,16 +84,16 @@ export default function Navbar() {
                   href={link.href}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors block ${
                     isActive(link.href)
-                      ? 'text-blue-600 bg-blue-50/50'
+                      ? 'text-blue-800 bg-blue-50/50'
                       : link.href === '/admin'
                         ? 'text-green-600 hover:text-green-700 hover:bg-green-50'
-                        : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                        : 'text-gray-600 hover:text-blue-800 hover:bg-gray-50'
                   }`}
                 >
                   {link.name}
                 </Link>
                 <span className={`absolute -bottom-1.5 left-0 w-full h-0.5 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300 ${
-                  link.href === '/admin' ? 'bg-green-500' : 'bg-blue-600'
+                  link.href === '/admin' ? 'bg-green-500' : 'bg-blue-800'
                 } ${isActive(link.href) ? 'scale-x-100' : ''}`} />
               </div>
             ))}
@@ -106,7 +106,7 @@ export default function Navbar() {
             <Link 
               href="/cart"
               className={`relative p-2.5 rounded-xl transition-colors ${
-                isActive('/cart') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100 hover:text-blue-600'
+                isActive('/cart') ? 'bg-blue-50 text-blue-800' : 'text-gray-600 hover:bg-gray-100 hover:text-blue-800'
               }`}
             >
               <ShoppingCart className="w-5 h-5" />
@@ -145,7 +145,7 @@ export default function Navbar() {
             {/* Mobile Menu Button */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-xl transition-colors"
+              className="md:hidden p-2 text-gray-600 hover:text-blue-800 hover:bg-gray-100 rounded-xl transition-colors"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -163,10 +163,10 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className={`block px-4 py-3 rounded-xl text-base font-medium ${
                   isActive(link.href)
-                    ? 'bg-blue-50 text-blue-600'
+                    ? 'bg-blue-50 text-blue-800'
                     : link.href === '/admin'
                       ? 'text-green-600 hover:text-green-700 hover:bg-green-50'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-800'
                 }`}
               >
                 {link.name}
