@@ -6,6 +6,9 @@ import CartExitGuard from '@/components/CartExitGuard'
 export const metadata: Metadata = {
   title: 'Hải Sản Sạch - Đặc Sản Miền Biển',
   description: 'Cá tươi, cá khô, chả cá, chả mực, mắm - trực tiếp từ cảng và ghe lưới',
+  icons: {
+    icon: '/icon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
