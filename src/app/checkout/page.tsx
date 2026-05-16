@@ -30,9 +30,10 @@ function CheckoutForm() {
   
   const totalKg = items.reduce((acc, item) => acc + item.quantity, 0)
   
-  const [deliveryMethod, setDeliveryMethod] = useState<'company' | 'viettel'>('company')
+  const [deliveryMethod, setDeliveryMethod] = useState<'company' | 'viettel' | 'hcm_inner'>('company')
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'transfer'>('cod')
   
+  const [receiverPhone, setReceiverPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
@@ -69,7 +70,16 @@ function CheckoutForm() {
     setError('')
 
     try {
-      const finalNote = `Tên: ${name}\nSĐT: ${phone}\nNhận hàng: ${deliveryMethod === 'company' ? 'Tại công ty' : `Viettel Post - ${address}`}\nGhi chú khách: ${note}`
+      let deliveryDetail = ''
+      if (deliveryMethod === 'company') {
+        deliveryDetail = 'Tại công ty'
+      } else if (deliveryMethod === 'hcm_inner') {
+        deliveryDetail = `Giao nội thành TPHCM - ĐC: ${address} - SĐT nhận: ${receiverPhone}`
+      } else {
+        deliveryDetail = `Viettel Post - ĐC: ${address}`
+      }
+
+      const finalNote = `Tên: ${name}\nSĐT: ${phone}\nNhận hàng: ${deliveryDetail}\nGhi chú khách: ${note}`
 
       // 1. Insert order — GẮN user_id để lịch sử mua hàng hiển thị đúng
       const { data: order, error: orderError } = await supabase
@@ -219,6 +229,47 @@ function CheckoutForm() {
                 </div>
                 <p className="text-sm text-slate-500 mt-2 ml-8">Phí ship ~5.000–10.000đ chia đều theo đơn chung, thu khi nhận hàng.</p>
               </label>
+
+              {/* HCM Inner Delivery */}
+              {totalKg >= 5 && (
+                <label className={`block border rounded-xl p-4 cursor-pointer transition-all duration-200 ${deliveryMethod === 'hcm_inner' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                  <input type="radio" name="delivery" className="hidden" checked={deliveryMethod === 'hcm_inner'} onChange={() => setDeliveryMethod('hcm_inner')} />
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${deliveryMethod === 'hcm_inner' ? 'border-blue-500' : 'border-slate-300'}`}>
+                      {deliveryMethod === 'hcm_inner' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <Building2 className={`w-5 h-5 ${deliveryMethod === 'hcm_inner' ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <span className={`font-semibold text-sm ${deliveryMethod === 'hcm_inner' ? 'text-blue-700' : 'text-slate-700'}`}>Giao tận nơi (Nội thành TPHCM)</span>
+                      </div>
+                      <span className="text-[10px] text-blue-600 font-bold mt-0.5 uppercase tracking-wider">Chỉ giao đơn trên 5kg</span>
+                    </div>
+                  </div>
+                  <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'hcm_inner' ? 'max-h-64 mt-3' : 'max-h-0'}`}>
+                    <div className="ml-8 space-y-3">
+                      <input
+                        required={deliveryMethod === 'hcm_inner'}
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Địa chỉ giao hàng (Số nhà, tên đường, quận...)"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-sm text-slate-800 placeholder-slate-400"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <input
+                        required={deliveryMethod === 'hcm_inner'}
+                        type="tel"
+                        value={receiverPhone}
+                        onChange={(e) => setReceiverPhone(e.target.value)}
+                        placeholder="Số điện thoại người nhận"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-sm text-slate-800 placeholder-slate-400"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                </label>
+              )}
 
               {totalKg >= 5 && (
                 <label className={`block border rounded-xl p-4 cursor-pointer transition-all duration-200 ${deliveryMethod === 'viettel' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
