@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useCart } from '@/store/cart'
 import { supabase } from '@/lib/supabase'
 import { 
@@ -123,6 +124,18 @@ function CheckoutForm() {
             <ShoppingCart className="w-5 h-5 text-blue-600" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Thanh toán</h1>
+        </div>
+
+        {/* Auth Tip Banner */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 mb-6 flex items-start gap-2">
+          <span className="text-lg">💡</span>
+          <p>
+            Bạn không cần đăng nhập để đặt hàng. Tuy nhiên, hãy{' '}
+            <Link href="/auth" className="text-blue-600 underline font-medium">
+              đăng ký tài khoản
+            </Link>{' '}
+            để theo dõi lịch sử đơn hàng dễ dàng hơn.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
