@@ -111,10 +111,10 @@ export default function HomePage() {
     }
   }
 
-  const handleCopyPayment = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleCopyPayment = (e: React.MouseEvent | React.TouchEvent, text: string, name: string) => {
     e.stopPropagation()
-    navigator.clipboard.writeText('4801205175150')
-    setCopyToast('Đã copy Số tài khoản Agribank: 4801205175150 & số điện thoại Momo: 0964671009!')
+    navigator.clipboard.writeText(text)
+    setCopyToast(`Đã copy ${name}: ${text}!`)
     setTimeout(() => setCopyToast(''), 3000)
   }
 
@@ -193,15 +193,15 @@ export default function HomePage() {
               >
                 Linh hoạt COD hoặc chuyển khoản nhanh chóng, uy tín 100%. Thông tin tài khoản (chạm để copy): <br />
                 <span 
-                  onClick={handleCopyPayment}
-                  onTouchEnd={handleCopyPayment}
+                  onClick={(e) => handleCopyPayment(e, '4801205175150', 'Số tài khoản Agribank')}
+                  onTouchEnd={(e) => handleCopyPayment(e, '4801205175150', 'Số tài khoản Agribank')}
                   className="font-bold text-blue-600 bg-blue-50 border border-blue-200/50 rounded px-1.5 py-0.5 mt-1 inline-block cursor-pointer hover:bg-blue-100 hover:text-blue-700 active:scale-95 transition-all select-all"
                 >
                   Agribank: 4801205175150
                 </span> <br />
                 <span 
-                  onClick={handleCopyPayment}
-                  onTouchEnd={handleCopyPayment}
+                  onClick={(e) => handleCopyPayment(e, '0964671009', 'Số điện thoại ví Momo')}
+                  onTouchEnd={(e) => handleCopyPayment(e, '0964671009', 'Số điện thoại ví Momo')}
                   className="font-bold text-blue-600 bg-blue-50 border border-blue-200/50 rounded px-1.5 py-0.5 mt-1 inline-block cursor-pointer hover:bg-blue-100 hover:text-blue-700 active:scale-95 transition-all select-all"
                 >
                   LÊ MINH QUYẾT / Momo: 0964671009
