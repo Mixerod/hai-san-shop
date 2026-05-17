@@ -39,6 +39,7 @@ export default function ProductsPage() {
   const [broadcastId, setBroadcastId] = useState<string | null>(null)
   const [broadcastText, setBroadcastText] = useState('')
   const [adminToast, setAdminToast] = useState<string | null>(null)
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>({})
   
   // Global Broadcast states
   const [globalMessage, setGlobalMessage] = useState('')
@@ -506,9 +507,21 @@ export default function ProductsPage() {
                   </div>
                   
                   {p.description && (
-                    <p className="text-slate-500 text-xs sm:text-sm mb-2 sm:mb-4 line-clamp-2 sm:line-clamp-3 leading-relaxed">
-                      {p.description}
-                    </p>
+                    <div className="relative">
+                      <p className={`text-slate-500 text-xs sm:text-sm mb-1 sm:mb-2 leading-relaxed transition-all duration-300 ${
+                        expandedDescriptions[p.id] ? '' : 'line-clamp-2 sm:line-clamp-3'
+                      }`}>
+                        {p.description}
+                      </p>
+                      {p.description.length > 60 && (
+                        <button
+                          onClick={() => setExpandedDescriptions(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
+                          className="text-blue-600 hover:text-blue-700 font-extrabold text-[10px] sm:text-xs mb-2 focus:outline-none flex items-center gap-0.5 cursor-pointer pb-1.5"
+                        >
+                          {expandedDescriptions[p.id] ? 'Thu gọn ▲' : 'Xem thêm ▼'}
+                        </button>
+                      )}
+                    </div>
                   )}
                   
                   {p.note && (
