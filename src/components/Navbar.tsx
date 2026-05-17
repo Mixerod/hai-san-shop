@@ -5,12 +5,12 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/store/cart'
 import { supabase } from '@/lib/supabase'
-import { ShoppingCart, Anchor, User, LogOut, LogIn, Menu, X, Bell } from 'lucide-react'
+import { ShoppingCart, Anchor, User, LogOut, LogIn, Menu, X, Bell, Trash2, Zap, ArrowRight, Plus, Minus } from 'lucide-react'
 
 export default function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { items } = useCart()
+  const { items, remove, updateQty, total, isOpen, setIsOpen } = useCart()
   const [hasHydrated, setHasHydrated] = useState(false)
   const [session, setSession] = useState<any>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -33,6 +33,36 @@ export default function Navbar() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [router])
+
+  // Block scrolling when drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
+  const getQtyStep = (unit: string) => {
+    const u = (unit || '').toLowerCase()
+    return (u.includes('kg') || u.includes('ký') || u.includes('ky') || u.includes('kg/')) ? 0.5 : 1
+  }
+
+  const handleDecreaseQty = (id: string, currentQty: number, unit: string) => {
+    const step = getQtyStep(unit)
+    const min = step
+    const newVal = Math.max(min, Math.round((currentQty - step) * 10) / 10)
+    updateQty(id, newVal)
+  }
+
+  const handleIncreaseQty = (id: string, currentQty: number, unit: string) => {
+    const step = getQtyStep(unit)
+    const newVal = Math.round((currentQty + step) * 10) / 10
+    updateQty(id, newVal)
+  }
 
   // Hydration state cho Cart để tránh Hydration Mismatch
   useEffect(() => {
@@ -280,10 +310,10 @@ export default function Navbar() {
             </div>
 
             {/* Cart with Premium Glowing indicator (Always visible on Mobile & Desktop) */}
-            <Link 
-              href="/cart"
-              className={`relative p-3 rounded-xl transition-all duration-300 ${
-                isActive('/cart') 
+            <button 
+              onClick={() => setIsOpen(true)}
+              className={`relative p-3 rounded-xl transition-all duration-300 cursor-pointer ${
+                isOpen 
                   ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25 border border-orange-400/50' 
                   : 'text-slate-300 hover:bg-white/5 border border-white/5 hover:text-white'
               }`}
@@ -294,7 +324,7 @@ export default function Navbar() {
                   {cartItemsCount}
                 </span>
               )}
-            </Link>
+            </button>
 
             {/* Desktop Auth/Profile premium glass button */}
             <div className="hidden md:flex items-center gap-2">
@@ -404,6 +434,159 @@ export default function Navbar() {
               </Link>
             )}
           </div>
+        </div>
+      )}
+      {/* Premium Slide-out Cart Drawer */}
+      {/* Backdrop */}
+      {hasHydrated && isOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-[4px] z-[100] transition-opacity duration-300 animate-in fade-in cursor-pointer"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      
+      {/* Drawer Panel */}
+      {hasHydrated && (
+        <div className={`fixed top-0 right-0 h-full w-full sm:w-[440px] bg-slate-950/95 backdrop-blur-2xl border-l border-blue-900/30 z-[101] shadow-[0_0_50px_rgba(8,18,45,0.8)] transition-all duration-300 transform flex flex-col ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}>
+          {/* Header */}
+          <div className="p-5 border-b border-blue-900/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-5.5 h-5.5 text-cyan-400" />
+              <h2 className="font-extrabold text-base text-slate-100 uppercase tracking-wider">Giỏ hàng của bạn</h2>
+              <span className="bg-blue-900/50 text-cyan-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-blue-800/30">
+                {items.length}
+              </span>
+            </div>
+            <button 
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {items.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                <div className="text-6xl mb-4 animate-bounce">🦐</div>
+                <p className="text-slate-300 font-extrabold text-base mb-2">Giỏ hàng đang trống</p>
+                <p className="text-slate-500 text-xs font-semibold max-w-[260px] leading-relaxed mb-6">
+                  Hải sản tươi sống cập bến Phan Thiết mỗi ngày. Hãy chọn những món tươi ngon nhất nhé!
+                </p>
+                <button
+                  onClick={() => {
+                    setIsOpen(false)
+                    router.push('/products')
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 active:scale-95 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-blue-500/20 cursor-pointer"
+                >
+                  Mua sắm ngay
+                </button>
+              </div>
+            ) : (
+              items.map((item) => (
+                <div 
+                  key={item.id} 
+                  className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex gap-3 hover:bg-white/[0.04] hover:border-blue-500/10 transition-all duration-300"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <p className="font-extrabold text-sm text-slate-100 truncate">{item.name}</p>
+                      <button 
+                        onClick={() => remove(item.id)} 
+                        className="text-slate-500 hover:text-red-450 transition-colors p-0.5 cursor-pointer shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center mt-2.5">
+                      {/* Price / unit */}
+                      <p className="text-xs text-slate-400 font-semibold">
+                        {item.price.toLocaleString('vi-VN')}đ/{item.unit}
+                      </p>
+
+                      {/* Quantity Selector */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDecreaseQty(item.id, item.quantity, item.unit)}
+                          className="w-6 h-6 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 active:scale-90 text-slate-300 transition-all font-black flex items-center justify-center select-none cursor-pointer"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        
+                        <span className="w-8 text-center text-slate-100 font-extrabold text-xs">
+                          {item.quantity}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleIncreaseQty(item.id, item.quantity, item.unit)}
+                          className="w-6 h-6 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 active:scale-90 text-slate-300 transition-all font-black flex items-center justify-center select-none cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Total for item */}
+                    <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-white/[0.03]">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Thành tiền</span>
+                      <span className="text-xs font-black text-cyan-400">
+                        {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer */}
+          {items.length > 0 && (
+            <div className="p-5 border-t border-blue-900/20 bg-slate-950/80 backdrop-blur-md space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 text-sm font-bold">Tổng cộng:</span>
+                <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 tracking-tight">
+                  {total().toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                {/* Checkout button */}
+                <button
+                  onClick={() => {
+                    setIsOpen(false)
+                    router.push('/checkout')
+                  }}
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-98 text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider border border-orange-600/10 cursor-pointer"
+                >
+                  <Zap className="w-4 h-4 fill-white animate-pulse" />
+                  <span>Tiến hành thanh toán</span>
+                  <ArrowRight className="w-4 h-4 ml-0.5" />
+                </button>
+
+                {/* View full Cart */}
+                <button
+                  onClick={() => {
+                    setIsOpen(false)
+                    router.push('/cart')
+                  }}
+                  className="w-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 active:scale-98 text-slate-200 font-extrabold py-3 rounded-xl transition-all text-xs uppercase tracking-wider cursor-pointer"
+                >
+                  Xem chi tiết giỏ hàng
+                </button>
+              </div>
+
+              <p className="text-[10px] text-center text-slate-500 font-bold uppercase tracking-wider">
+                ⚡ Giao từ Phan Thiết • Cam kết 100% tươi sạch
+              </p>
+            </div>
+          )}
         </div>
       )}
     </nav>

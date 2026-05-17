@@ -16,25 +16,30 @@ type CartStore = {
   updateQty: (id: string, quantity: number) => void
   clear: () => void
   total: () => number
+  isOpen: boolean
+  setIsOpen: (open: boolean) => void
 }
 
 export const useCart = create<CartStore>()(
   persist(
     (set, get) => ({
       items: [],
+      isOpen: false,
+      setIsOpen: (open) => set({ isOpen: open }),
 
       add: (item) => set((state) => {
-  const qty = item.quantity ?? 1
-  const existing = state.items.find(i => i.id === item.id)
-  if (existing) {
-    return {
-      items: state.items.map(i =>
-        i.id === item.id ? { ...i, quantity: i.quantity + qty } : i
-      )
-    }
-  }
-  return { items: [...state.items, { ...item, quantity: qty }] }
-     }), 
+        const qty = item.quantity ?? 1
+        const existing = state.items.find(i => i.id === item.id)
+        let newItems
+        if (existing) {
+          newItems = state.items.map(i =>
+            i.id === item.id ? { ...i, quantity: i.quantity + qty } : i
+          )
+        } else {
+          newItems = [...state.items, { ...item, quantity: qty }]
+        }
+        return { items: newItems, isOpen: true }
+      }), 
 
       remove: (id) => set((state) => ({
         items: state.items.filter(i => i.id !== id)
@@ -48,6 +53,9 @@ export const useCart = create<CartStore>()(
 
       total: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
     }),
-    { name: 'cart-storage' }
+    { 
+      name: 'cart-storage',
+      partialize: (state) => ({ items: state.items }),
+    }
   )
 )
