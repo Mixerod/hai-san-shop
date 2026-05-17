@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -47,7 +49,7 @@ export default function ProductsPage() {
   // Category states
   const [selectedCategory, setSelectedCategory] = useState('Tất cả')
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
-  const categories = ['Tất cả', 'Cá tươi', 'Cá khô', 'Tôm', 'Cua', 'Mực', 'Chả', 'Mắm & Nước mắm', 'Khác']
+  const categories = ['Tất cả', 'Cá tươi', 'Cá khô', 'Tôm', 'Cua', 'Mực', 'Chả', 'Nước mắm', 'Khác']
 
   // Category fallback mapping for instant out-of-the-box compatibility
   function getFallbackCategory(p: Product) {
@@ -58,18 +60,40 @@ export default function ProductsPage() {
     if (nameLower.includes('tôm') || nameLower.includes('ghẹ tôm')) return 'Tôm'
     if (nameLower.includes('cua') || nameLower.includes('ghẹ')) return 'Cua'
     if (nameLower.includes('mực') || nameLower.includes('bạch tuộc')) return 'Mực'
-    if (nameLower.includes('mắm') || nameLower.includes('nước mắm')) return 'Mắm & Nước mắm'
+    if (nameLower.includes('mắm') || nameLower.includes('nước mắm')) return 'Nước mắm'
     if (nameLower.includes('cá') || nameLower.includes('thu') || nameLower.includes('bớp') || nameLower.includes('nục') || nameLower.includes('mú') || nameLower.includes('hồi') || nameLower.includes('chỉ vàng')) return 'Cá tươi'
     return 'Khác'
+  }
+
+  // Group and sort products by category priority, then alphabetically by name
+  function sortProducts(items: Product[]): Product[] {
+    const categoryOrder = ['Cá tươi', 'Cá khô', 'Tôm', 'Cua', 'Mực', 'Chả', 'Nước mắm', 'Khác']
+    return [...items].sort((a, b) => {
+      const catA = getFallbackCategory(a)
+      const catB = getFallbackCategory(b)
+      
+      const indexA = categoryOrder.indexOf(catA)
+      const indexB = categoryOrder.indexOf(catB)
+      
+      const posA = indexA === -1 ? 999 : indexA
+      const posB = indexB === -1 ? 999 : indexB
+      
+      if (posA !== posB) {
+        return posA - posB
+      }
+      
+      return a.name.localeCompare(b.name, 'vi')
+    })
   }
 
   // Save category change to Supabase
   async function handleSaveCategory(productId: string, newCategory: string) {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('products')
         .update({ category: newCategory })
         .eq('id', productId)
+        .select()
 
       if (error) {
         if (error.message.includes('column') && error.message.includes('does not exist')) {
@@ -77,6 +101,11 @@ export default function ProductsPage() {
           return
         }
         throw error
+      }
+
+      if (!data || data.length === 0) {
+        alert('💡 Chào Quyết! Cập nhật không thành công do chính sách bảo mật (RLS) trên Supabase của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền cập nhật sản phẩm:\n\nCREATE POLICY "Allow admin update products" ON public.products FOR UPDATE USING (true) WITH CHECK (true);')
+        return
       }
 
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, category: newCategory } : p))
@@ -140,12 +169,18 @@ export default function ProductsPage() {
 
     setSavingId(productId)
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('products')
         .update({ price: newPrice })
         .eq('id', productId)
+        .select()
 
       if (error) throw error
+
+      if (!data || data.length === 0) {
+        alert('💡 Chào Quyết! Cập nhật không thành công do chính sách bảo mật (RLS) trên Supabase của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền cập nhật sản phẩm:\n\nCREATE POLICY "Allow admin update products" ON public.products FOR UPDATE USING (true) WITH CHECK (true);')
+        return
+      }
 
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, price: newPrice } : p))
       showAdminToast('Đã lưu giá mới!')
@@ -433,7 +468,7 @@ export default function ProductsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-6 md:gap-8">
-          {products
+          {sortProducts(products)
             .filter((p) => selectedCategory === 'Tất cả' || getFallbackCategory(p) === selectedCategory)
             .map((p) => (
               <div 
