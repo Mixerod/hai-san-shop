@@ -194,9 +194,9 @@ export default function Navbar() {
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-800 to-cyan-500 flex items-center justify-center border border-cyan-400/30 group-hover:border-cyan-300 shadow-md group-hover:scale-105 transition-all duration-300">
               <Anchor className="w-6 h-6 text-white group-hover:rotate-12 transition-transform duration-300" />
             </div>
-            <div className="flex flex-col text-left justify-center py-0.5">
-              <span className="font-black text-xl tracking-wider uppercase shimmer-logo-text leading-[1.2] pb-0.5">Hải Sản Sạch</span>
-              <span className="text-[10px] text-cyan-400 font-semibold tracking-widest uppercase leading-none">Phan Thiết Port</span>
+            <div className="flex flex-col text-left justify-center py-0.5 select-none">
+              <span className="font-black text-xl tracking-wider uppercase shimmer-logo-text leading-[1.2] pb-0.5 whitespace-nowrap">Hải Sản Sạch</span>
+              <span className="text-[10px] text-cyan-400 font-semibold tracking-wide uppercase leading-none whitespace-nowrap">Phan Thiết Port</span>
             </div>
           </Link>
 
@@ -224,13 +224,13 @@ export default function Navbar() {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             
-            {/* Notification Bell Dropdown */}
-            <div className="relative">
+            {/* Desktop Notification Bell */}
+            <div className="relative hidden md:block">
               <button
                 onClick={handleToggleNotifications}
-                className={`p-3 rounded-xl transition-all duration-300 relative border ${
+                className={`p-3 rounded-xl transition-all duration-300 relative border cursor-pointer ${
                   showNotifications
                     ? 'bg-blue-950/60 border-blue-500/50 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
                     : 'text-slate-300 hover:bg-white/5 border border-white/5 hover:text-white hover:border-white/10'
@@ -279,7 +279,7 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Cart with Premium Glowing indicator */}
+            {/* Cart with Premium Glowing indicator (Always visible on Mobile & Desktop) */}
             <Link 
               href="/cart"
               className={`relative p-3 rounded-xl transition-all duration-300 ${
@@ -296,50 +296,52 @@ export default function Navbar() {
               )}
             </Link>
 
-            {/* Auth/Profile premium glass button */}
-            {session ? (
-              <div className="flex items-center gap-2">
+            {/* Desktop Auth/Profile premium glass button */}
+            <div className="hidden md:flex items-center gap-2">
+              {session ? (
+                <div className="flex items-center gap-2">
+                  <Link 
+                    href="/profile"
+                    style={{ padding: '10px 22px' }}
+                    className={`flex items-center gap-2 rounded-full leading-none transition-all duration-300 border ${
+                      isActive('/profile') 
+                        ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300' 
+                        : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10 hover:border-white/10 hover:text-white'
+                    }`}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-cyan-950/80 flex items-center justify-center border border-cyan-500/30 relative">
+                      <User className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900 animate-pulse" />
+                    </div>
+                    <span className="text-xs font-bold tracking-wide uppercase truncate max-w-[90px]">
+                      {session.user.email?.split('@')[0]}
+                    </span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    style={{ padding: '11px' }}
+                    className="rounded-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300 leading-none cursor-pointer"
+                    title="Đăng xuất"
+                  >
+                    <LogOut className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+              ) : (
                 <Link 
-                  href="/profile"
-                  style={{ padding: '10px 22px' }}
-                  className={`flex items-center gap-2 rounded-full leading-none transition-all duration-300 border ${
-                    isActive('/profile') 
-                      ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300' 
-                      : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10 hover:border-white/10 hover:text-white'
-                  }`}
+                  href="/auth"
+                  style={{ padding: '12px 26px' }}
+                  className="flex items-center gap-2.5 text-white text-xs font-black tracking-widest uppercase rounded-full leading-none transition-all shadow-lg hover:shadow-orange-500/30 hover:scale-102 active:scale-95 group overflow-hidden border border-orange-400/20 animate-shimmer-auth"
                 >
-                  <div className="w-6 h-6 rounded-full bg-cyan-950/80 flex items-center justify-center border border-cyan-500/30 relative">
-                    <User className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900 animate-pulse" />
-                  </div>
-                  <span className="text-xs font-bold tracking-wide uppercase hidden sm:block truncate max-w-[90px]">
-                    {session.user.email?.split('@')[0]}
-                  </span>
+                  <LogIn className="w-4 h-4" />
+                  <span>Đăng nhập</span>
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  style={{ padding: '11px' }}
-                  className="rounded-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300 leading-none"
-                  title="Đăng xuất"
-                >
-                  <LogOut className="w-4.5 h-4.5" />
-                </button>
-              </div>
-            ) : (
-              <Link 
-                href="/auth"
-                style={{ padding: '12px 26px' }}
-                className="flex items-center gap-2.5 text-white text-xs font-black tracking-widest uppercase rounded-full leading-none transition-all shadow-lg hover:shadow-orange-500/30 hover:scale-102 active:scale-95 group overflow-hidden border border-orange-400/20 animate-shimmer-auth"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Đăng nhập</span>
-              </Link>
-            )}
+              )}
+            </div>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile Hamburger Menu Button */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-3 text-slate-300 hover:text-white hover:bg-white/5 border border-white/5 rounded-xl transition-colors"
+              className="md:hidden p-3 text-slate-300 hover:text-white hover:bg-white/5 border border-white/5 rounded-xl transition-colors cursor-pointer"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -348,14 +350,14 @@ export default function Navbar() {
 
       {/* Mobile Menu Dropdown with slide-down glassmorphism */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-blue-900/30 bg-slate-950/95 backdrop-blur-xl absolute w-full left-0 right-0 shadow-[0_15px_30px_rgba(8,18,45,0.8)] transition-all duration-300">
+        <div className="md:hidden border-t border-blue-900/30 bg-slate-950/95 backdrop-blur-xl absolute w-full left-0 right-0 shadow-[0_15px_30px_rgba(8,18,45,0.8)] transition-all duration-300 animate-in slide-in-from-top-5 duration-300 z-50">
           <div className="px-4 py-6 space-y-2">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`block px-5 py-3.5 rounded-xl text-sm font-black tracking-widest uppercase transition-all duration-200 border ${
+                className={`block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border ${
                   isActive(link.href)
                     ? 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
                     : link.href === '/admin'
@@ -366,6 +368,41 @@ export default function Navbar() {
                 {link.name}
               </Link>
             ))}
+
+            {/* Mobile Auth Links rendered in the same clean, uniform style */}
+            {session ? (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border ${
+                    isActive('/profile')
+                      ? 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
+                      : 'text-slate-300 border-transparent hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  Tài khoản ({session.user.email?.split('@')[0]})
+                </Link>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    handleLogout()
+                  }}
+                  className="w-full text-left block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border text-red-400 border-transparent hover:bg-red-500/10 cursor-pointer"
+                >
+                  Đăng xuất
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/auth"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-2.5 text-white text-xs font-black tracking-wide uppercase rounded-xl py-3.5 leading-none transition-all shadow-lg hover:shadow-orange-500/30 hover:scale-102 active:scale-95 group overflow-hidden border border-orange-400/20 animate-shimmer-auth text-center"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Đăng nhập</span>
+              </Link>
+            )}
           </div>
         </div>
       )}
