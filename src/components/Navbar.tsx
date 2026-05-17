@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/store/cart'
@@ -51,6 +51,11 @@ export default function Navbar() {
     return (u.includes('kg') || u.includes('ký') || u.includes('ky') || u.includes('kg/')) ? 0.5 : 1
   }
 
+  const getQtyMin = (unit: string) => getQtyStep(unit)
+
+  const [qtyInputs, setQtyInputs] = useState<Record<string, string>>({})
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
+
   const handleDecreaseQty = (id: string, currentQty: number, unit: string) => {
     const step = getQtyStep(unit)
     const min = step
@@ -62,6 +67,32 @@ export default function Navbar() {
     const step = getQtyStep(unit)
     const newVal = Math.round((currentQty + step) * 10) / 10
     updateQty(id, newVal)
+  }
+
+  const handleQtyInputChange = (id: string, val: string, unit: string) => {
+    setQtyInputs(prev => ({ ...prev, [id]: val }))
+  }
+
+  const handleInputBlur = (id: string, currentQty: number, unit: string) => {
+    setFocusedItemId(null)
+    const valStr = qtyInputs[id]
+    if (valStr !== undefined) {
+      let val = parseFloat(valStr)
+      const min = getQtyMin(unit)
+      if (isNaN(val) || val < min) {
+        val = min
+      } else {
+        const step = getQtyStep(unit)
+        val = Math.round(val / step) * step
+        if (val < min) val = min
+      }
+      updateQty(id, val)
+      setQtyInputs(prev => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    }
   }
 
   // Hydration state cho Cart để tránh Hydration Mismatch
@@ -95,6 +126,12 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  // Ref to track latest showNotifications state to avoid stale closure in realtime listener
+  const showNotificationsRef = useRef(showNotifications)
+  useEffect(() => {
+    showNotificationsRef.current = showNotifications
+  }, [showNotifications])
+
   // Load and subscribe to notifications
   useEffect(() => {
     async function loadNotifications() {
@@ -106,9 +143,14 @@ export default function Navbar() {
           .limit(5)
         if (!error && data) {
           setNotifications(data)
-          const lastRead = localStorage.getItem('last_read_notification_time') || '0'
-          const lastReadTime = new Date(lastRead).getTime()
-          const unread = data.filter(n => new Date(n.created_at).getTime() > lastReadTime).length
+          const readIdsString = localStorage.getItem('read_notification_ids') || '[]'
+          let readIds: string[] = []
+          try {
+            readIds = JSON.parse(readIdsString)
+          } catch {
+            readIds = []
+          }
+          const unread = data.filter(n => !readIds.includes(String(n.id))).length
           setUnreadCount(unread)
         }
       } catch (err) {
@@ -122,8 +164,28 @@ export default function Navbar() {
     const channel = supabase
       .channel('realtime_notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
-        setNotifications(prev => [payload.new, ...prev.slice(0, 4)])
-        setUnreadCount(c => c + 1)
+        const newNotification = payload.new
+        setNotifications(prev => {
+          const updated = [newNotification, ...prev.slice(0, 4)]
+          if (showNotificationsRef.current) {
+            const readIdsString = localStorage.getItem('read_notification_ids') || '[]'
+            let readIds: string[] = []
+            try {
+              readIds = JSON.parse(readIdsString)
+            } catch {
+              readIds = []
+            }
+            if (!readIds.includes(String(newNotification.id))) {
+              readIds.push(String(newNotification.id))
+              localStorage.setItem('read_notification_ids', JSON.stringify(readIds))
+            }
+          }
+          return updated
+        })
+        
+        if (!showNotificationsRef.current) {
+          setUnreadCount(c => c + 1)
+        }
       })
       .subscribe()
 
@@ -133,10 +195,12 @@ export default function Navbar() {
   }, [])
 
   const handleToggleNotifications = () => {
-    setShowNotifications(!showNotifications)
-    if (!showNotifications) {
+    const nextState = !showNotifications
+    setShowNotifications(nextState)
+    if (nextState) {
       setUnreadCount(0)
-      localStorage.setItem('last_read_notification_time', new Date().toISOString())
+      const currentIds = notifications.map(n => String(n.id))
+      localStorage.setItem('read_notification_ids', JSON.stringify(currentIds))
     }
   }
 
@@ -510,23 +574,36 @@ export default function Navbar() {
                       </p>
 
                       {/* Quantity Selector */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-lg p-0.5">
                         <button
                           type="button"
                           onClick={() => handleDecreaseQty(item.id, item.quantity, item.unit)}
-                          className="w-6 h-6 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 active:scale-90 text-slate-300 transition-all font-black flex items-center justify-center select-none cursor-pointer"
+                          className="w-7 h-7 rounded-md hover:bg-white/10 active:scale-90 text-slate-300 transition-all font-black flex items-center justify-center select-none cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         
-                        <span className="w-8 text-center text-slate-100 font-extrabold text-xs">
-                          {item.quantity}
-                        </span>
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="number"
+                            min={getQtyMin(item.unit)}
+                            step={getQtyStep(item.unit)}
+                            value={qtyInputs[item.id] !== undefined ? qtyInputs[item.id] : String(item.quantity)}
+                            onChange={(e) => handleQtyInputChange(item.id, e.target.value, item.unit)}
+                            onFocus={(e) => {
+                              setFocusedItemId(item.id)
+                              e.target.select()
+                            }}
+                            onBlur={() => handleInputBlur(item.id, item.quantity, item.unit)}
+                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                            className="w-8 bg-transparent text-center text-slate-100 font-extrabold text-xs focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
 
                         <button
                           type="button"
                           onClick={() => handleIncreaseQty(item.id, item.quantity, item.unit)}
-                          className="w-6 h-6 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 active:scale-90 text-slate-300 transition-all font-black flex items-center justify-center select-none cursor-pointer"
+                          className="w-7 h-7 rounded-md hover:bg-white/10 active:scale-90 text-slate-300 transition-all font-black flex items-center justify-center select-none cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
                         </button>

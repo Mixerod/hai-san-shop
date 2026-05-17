@@ -295,9 +295,9 @@ function ProfileContent() {
       <div className="w-full max-w-3xl">
         
         {/* Header & Logout */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10 px-2">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/20">
+        <div className="flex flex-col items-center justify-center gap-4 mb-10 px-2 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-blue-500/20">
               {profile.full_name ? profile.full_name.charAt(0).toUpperCase() : session?.user?.email?.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -309,7 +309,7 @@ function ProfileContent() {
           </div>
           <button 
             onClick={handleSignOut}
-            className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-rose-50 text-rose-600 rounded-xl transition-all border border-gray-200 hover:border-rose-200 self-start sm:self-auto text-xs font-black uppercase tracking-wider shadow-sm active:scale-95"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white hover:bg-rose-50 text-rose-600 rounded-xl transition-all border border-gray-200 hover:border-rose-200 text-xs font-black uppercase tracking-wider shadow-sm active:scale-95"
           >
             <LogOut className="w-4 h-4" />
             Đăng xuất
@@ -345,10 +345,12 @@ function ProfileContent() {
         {/* Tab Content: Profile */}
         {activeTab === 'profile' && (
           <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-10 shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-0.5 hover:border-blue-500/10 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-xl font-bold text-slate-800 mb-8 flex items-center gap-3">
-              <span className="w-1.5 h-6 bg-blue-500 rounded-full animate-pulse"></span>
-              Thông tin giao hàng mặc định
-            </h2>
+            <div className="flex flex-col items-center text-center mb-8">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center justify-center gap-3">
+                Thông tin giao hàng
+              </h2>
+              <div className="w-10 h-1 bg-blue-500 rounded-full mt-3 animate-pulse"></div>
+            </div>
 
             {profileMsg.text && (
               <div className={`mb-8 flex items-start gap-3 p-4 rounded-xl text-sm font-medium border animate-in fade-in duration-300 ${
@@ -395,7 +397,7 @@ function ProfileContent() {
                 />
               </div>
 
-               <div className="pt-4">
+               <div className="pt-4 flex justify-center">
                 <button
                   type="submit"
                   disabled={savingProfile}
@@ -418,24 +420,23 @@ function ProfileContent() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             
             {/* Banner Gọi Điện Khẩn Cấp */}
-            <div className="bg-gradient-to-r from-amber-500/[0.04] to-orange-500/[0.01] border border-orange-200/60 rounded-3xl p-6 sm:p-8 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 shadow-sm hover:shadow-lg hover:border-orange-500/20 transition-all duration-500 ring-1 ring-orange-500/5">
-              <div className="flex-1 space-y-3">
-                <div className="flex items-center gap-2 text-orange-600 font-extrabold text-xs uppercase tracking-widest">
-                  <span className="flex h-2.5 w-2.5 rounded-full bg-orange-500 animate-pulse"></span>
-                  Hỗ trợ khẩn cấp
-                </div>
-                <div className="text-slate-800 text-sm sm:text-base font-semibold leading-relaxed">
-                  Bạn cần ghi chú thêm, đổi món hoặc cần hỗ trợ giao hàng? Hãy gọi/Zalo ngay cho Quyết: 
-                  <a href="tel:0964671009" className="inline-block ml-2 font-black text-2xl text-orange-600 hover:text-orange-700 transition-colors border-b-2 border-orange-200 hover:border-orange-500 leading-none">
-                    0964671009
-                  </a>
-                </div>
+            <div className="bg-gradient-to-r from-amber-500/[0.04] to-orange-500/[0.01] border border-orange-200/60 rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center justify-center gap-4 shadow-sm hover:shadow-lg hover:border-orange-500/20 transition-all duration-500 ring-1 ring-orange-500/5">
+              <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-xs uppercase tracking-widest">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+                Hỗ trợ khẩn cấp
+              </div>
+              <div className="text-slate-800 text-sm sm:text-base font-semibold leading-relaxed">
+                Bạn cần ghi chú thêm, đổi món hoặc cần hỗ trợ giao hàng? Hãy gọi/Zalo ngay cho Quyết: 
+                <br className="hidden sm:block" />
+                <a href="tel:0964671009" className="inline-block mt-2 font-black text-2xl sm:text-3xl text-orange-600 hover:text-orange-700 transition-colors border-b-2 border-orange-200 hover:border-orange-500 leading-none">
+                  0964671009
+                </a>
               </div>
               <a 
                 href="https://zalo.me/0964671009"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="shrink-0 bg-[#0068FF] hover:bg-[#0054cc] active:scale-95 text-white px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-3 text-base shadow-xl shadow-blue-500/25 w-full xl:w-auto justify-center group border border-blue-600/10"
+                className="mt-2 shrink-0 bg-[#0068FF] hover:bg-[#0054cc] active:scale-95 text-white px-8 py-3.5 rounded-2xl font-black transition-all flex items-center justify-center gap-3 text-base shadow-xl shadow-blue-500/25 border border-blue-600/10 w-full sm:w-auto"
               >
                 <MessageCircle className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                 Nhắn Zalo ngay

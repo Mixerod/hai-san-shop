@@ -30,7 +30,13 @@ function CheckoutForm() {
   const [note, setNote] = useState(searchParams.get('note') || '')
   const [session, setSession] = useState<any>(null)
   
-  const totalKg = items.reduce((acc, item) => acc + item.quantity, 0)
+  const totalKg = items.reduce((acc, item) => {
+    const u = (item.unit || '').toLowerCase()
+    if (u.includes('kg') || u.includes('ký') || u.includes('ky') || u.includes('kg/')) {
+      return acc + item.quantity
+    }
+    return acc
+  }, 0)
   
   const [deliveryMethod, setDeliveryMethod] = useState<'company' | 'viettel' | 'hcm_inner'>('company')
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'transfer'>('cod')
@@ -53,19 +59,43 @@ function CheckoutForm() {
 
   useEffect(() => {
     setHasHydrated(true)
+    
+    // Prefill from localStorage for frictionless guest checkout
+    if (typeof window !== 'undefined') {
+      const savedName = localStorage.getItem('checkout_guest_name')
+      const savedPhone = localStorage.getItem('checkout_guest_phone')
+      const savedAddress = localStorage.getItem('checkout_guest_address')
+      if (savedName) setName(savedName)
+      if (savedPhone) {
+        setPhone(savedPhone)
+        setReceiverPhone(savedPhone)
+      }
+      if (savedAddress) setAddress(savedAddress)
+    }
+
     // Lấy session để gắn user_id vào đơn hàng → lịch sử mua hàng hoạt động
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      // Prefill tên/SĐT từ profile nếu đã đăng nhập
+      // Prefill tên/SĐT từ profile nếu đã đăng nhập (sẽ ghi đè thông tin guest vì thông tin đăng nhập được ưu tiên)
       if (session?.user?.id) {
         supabase.from('profiles').select('full_name, phone').eq('id', session.user.id).single()
           .then(({ data }) => {
             if (data?.full_name) setName(data.full_name)
-            if (data?.phone) setPhone(data.phone)
+            if (data?.phone) {
+              setPhone(data.phone)
+              setReceiverPhone(data.phone)
+            }
           })
       }
     })
   }, [])
+
+  // Safeguard: Force delivery method to 'company' if totalKg is less than 5
+  useEffect(() => {
+    if (totalKg < 5 && deliveryMethod !== 'company') {
+      setDeliveryMethod('company')
+    }
+  }, [totalKg, deliveryMethod])
 
   useEffect(() => {
     if (hasHydrated && items.length === 0) {
@@ -83,6 +113,12 @@ function CheckoutForm() {
     setError('')
 
     try {
+      // Save guest info for seamless autofill next time
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('checkout_guest_name', name)
+        localStorage.setItem('checkout_guest_phone', phone)
+        localStorage.setItem('checkout_guest_address', address)
+      }
       if (paymentMethod === 'transfer') {
         try {
           navigator.clipboard.writeText('4801205175150')
@@ -149,11 +185,14 @@ function CheckoutForm() {
       <div className="w-full max-w-2xl">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
-            <ShoppingCart className="w-5 h-5 text-blue-600" />
+        <div className="flex flex-col items-center justify-center gap-3 mb-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shadow-sm">
+            <ShoppingCart className="w-7 h-7 text-blue-600" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Thanh toán</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">Thanh toán</h1>
+          <p className="text-slate-500 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+            Vui lòng điền thông tin bên dưới để chúng tôi có thể giao hải sản tươi ngon nhất đến bạn.
+          </p>
         </div>
 
         {/* Auth Tip Banner */}
@@ -251,21 +290,60 @@ function CheckoutForm() {
               </label>
 
               {/* HCM Inner Delivery */}
-              {totalKg >= 5 && (
-                <label className={`block border rounded-xl p-4 cursor-pointer transition-all duration-200 ${deliveryMethod === 'hcm_inner' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                  <input type="radio" name="delivery" className="hidden" checked={deliveryMethod === 'hcm_inner'} onChange={() => setDeliveryMethod('hcm_inner')} />
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${deliveryMethod === 'hcm_inner' ? 'border-blue-500' : 'border-slate-300'}`}>
-                      {deliveryMethod === 'hcm_inner' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <Building2 className={`w-5 h-5 ${deliveryMethod === 'hcm_inner' ? 'text-blue-600' : 'text-slate-400'}`} />
-                        <span className={`font-semibold text-sm ${deliveryMethod === 'hcm_inner' ? 'text-blue-700' : 'text-slate-700'}`}>Giao tận nơi (Nội thành TPHCM)</span>
-                      </div>
-                      <span className="text-[10px] text-blue-600 font-bold mt-0.5 uppercase tracking-wider">Chỉ giao đơn trên 5kg</span>
-                    </div>
+              <label 
+                className={`block border rounded-xl p-4 transition-all duration-200 ${
+                  totalKg < 5 
+                    ? 'border-slate-200 bg-slate-50/50 opacity-60 cursor-not-allowed'
+                    : deliveryMethod === 'hcm_inner' 
+                      ? 'border-blue-500 bg-blue-50 cursor-pointer' 
+                      : 'border-slate-200 hover:border-slate-300 bg-white cursor-pointer'
+                }`}
+              >
+                <input 
+                  type="radio" 
+                  name="delivery" 
+                  className="hidden" 
+                  disabled={totalKg < 5}
+                  checked={deliveryMethod === 'hcm_inner'} 
+                  onChange={() => setDeliveryMethod('hcm_inner')} 
+                />
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    totalKg < 5
+                      ? 'border-slate-200 bg-slate-100'
+                      : deliveryMethod === 'hcm_inner' 
+                        ? 'border-blue-500' 
+                        : 'border-slate-300'
+                  }`}>
+                    {deliveryMethod === 'hcm_inner' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
                   </div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <Building2 className={`w-5 h-5 ${
+                        totalKg < 5
+                          ? 'text-slate-300'
+                          : deliveryMethod === 'hcm_inner' 
+                            ? 'text-blue-600' 
+                            : 'text-slate-400'
+                      }`} />
+                      <span className={`font-semibold text-sm ${
+                        totalKg < 5
+                          ? 'text-slate-400 font-bold'
+                          : deliveryMethod === 'hcm_inner' 
+                            ? 'text-blue-700' 
+                            : 'text-slate-700'
+                      }`}>Giao tận nơi (Nội thành TPHCM)</span>
+                    </div>
+                    {totalKg < 5 ? (
+                      <span className="text-[11px] text-red-500 font-extrabold mt-1 uppercase tracking-wider flex items-center gap-1">
+                        ⚠️ Giao tận nơi: Cần mua thêm ${(5 - totalKg).toFixed(1)}kg hải sản nữa để đạt mức tối thiểu (5kg).
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-blue-600 font-bold mt-0.5 uppercase tracking-wider">Chỉ giao đơn trên 5kg</span>
+                    )}
+                  </div>
+                </div>
+                {totalKg >= 5 && (
                   <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'hcm_inner' ? 'max-h-64 mt-3' : 'max-h-0'}`}>
                     <div className="ml-8 space-y-3">
                       <input
@@ -288,20 +366,64 @@ function CheckoutForm() {
                       />
                     </div>
                   </div>
-                </label>
-              )}
+                )}
+              </label>
 
-              {totalKg >= 5 && (
-                <label className={`block border rounded-xl p-4 cursor-pointer transition-all duration-200 ${deliveryMethod === 'viettel' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                  <input type="radio" name="delivery" className="hidden" checked={deliveryMethod === 'viettel'} onChange={() => setDeliveryMethod('viettel')} />
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${deliveryMethod === 'viettel' ? 'border-blue-500' : 'border-slate-300'}`}>
-                      {deliveryMethod === 'viettel' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
-                    </div>
-                    <Truck className={`w-5 h-5 ${deliveryMethod === 'viettel' ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span className={`font-semibold text-sm ${deliveryMethod === 'viettel' ? 'text-blue-700' : 'text-slate-700'}`}>Giao tận nơi (Viettel Post)</span>
+              {/* Viettel Post Delivery */}
+              <label 
+                className={`block border rounded-xl p-4 transition-all duration-200 ${
+                  totalKg < 5 
+                    ? 'border-slate-200 bg-slate-50/50 opacity-60 cursor-not-allowed'
+                    : deliveryMethod === 'viettel' 
+                      ? 'border-blue-500 bg-blue-50 cursor-pointer' 
+                      : 'border-slate-200 hover:border-slate-300 bg-white cursor-pointer'
+                }`}
+              >
+                <input 
+                  type="radio" 
+                  name="delivery" 
+                  className="hidden" 
+                  disabled={totalKg < 5}
+                  checked={deliveryMethod === 'viettel'} 
+                  onChange={() => setDeliveryMethod('viettel')} 
+                />
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    totalKg < 5
+                      ? 'border-slate-200 bg-slate-100'
+                      : deliveryMethod === 'viettel' 
+                        ? 'border-blue-500' 
+                        : 'border-slate-300'
+                  }`}>
+                    {deliveryMethod === 'viettel' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
                   </div>
-                  <p className="text-sm text-slate-500 mt-2 ml-8">Phí ship Viettel Post tính theo khoảng cách, liên hệ báo giá.</p>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <Truck className={`w-5 h-5 ${
+                        totalKg < 5
+                          ? 'text-slate-300'
+                          : deliveryMethod === 'viettel' 
+                            ? 'text-blue-600' 
+                            : 'text-slate-400'
+                      }`} />
+                      <span className={`font-semibold text-sm ${
+                        totalKg < 5
+                          ? 'text-slate-400 font-bold'
+                          : deliveryMethod === 'viettel' 
+                            ? 'text-blue-700' 
+                            : 'text-slate-700'
+                      }`}>Giao tận nơi (Viettel Post)</span>
+                    </div>
+                    {totalKg < 5 ? (
+                      <span className="text-[11px] text-red-500 font-extrabold mt-1 uppercase tracking-wider flex items-center gap-1">
+                        ⚠️ Giao tận nơi: Cần mua thêm ${(5 - totalKg).toFixed(1)}kg hải sản nữa để đạt mức tối thiểu (5kg).
+                      </span>
+                    ) : (
+                      <p className="text-sm text-slate-500 mt-2 ml-8">Phí ship Viettel Post tính theo khoảng cách, liên hệ báo giá.</p>
+                    )}
+                  </div>
+                </div>
+                {totalKg >= 5 && (
                   <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'viettel' ? 'max-h-32 mt-3' : 'max-h-0'}`}>
                     <div className="ml-8">
                       <input
@@ -315,8 +437,8 @@ function CheckoutForm() {
                       />
                     </div>
                   </div>
-                </label>
-              )}
+                )}
+              </label>
             </div>
           </section>
 

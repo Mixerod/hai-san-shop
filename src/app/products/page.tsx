@@ -46,7 +46,7 @@ export default function ProductsPage() {
   const handleDecreaseQty = (productId: string, unit: string) => {
     const step = getQtyStep(unit)
     const min = getQtyMin(unit)
-    const currentStr = quantities[productId] || '1'
+    const currentStr = quantities[productId] !== undefined ? quantities[productId] : String(min)
     const currentVal = parseFloat(currentStr) || min
     const newVal = Math.max(min, Math.round((currentVal - step) * 10) / 10)
     setQuantities(prev => ({ ...prev, [productId]: String(newVal) }))
@@ -54,8 +54,9 @@ export default function ProductsPage() {
 
   const handleIncreaseQty = (productId: string, unit: string) => {
     const step = getQtyStep(unit)
-    const currentStr = quantities[productId] || '1'
-    const currentVal = parseFloat(currentStr) || 1
+    const min = getQtyMin(unit)
+    const currentStr = quantities[productId] !== undefined ? quantities[productId] : String(min)
+    const currentVal = parseFloat(currentStr) || min
     const newVal = Math.round((currentVal + step) * 10) / 10
     setQuantities(prev => ({ ...prev, [productId]: String(newVal) }))
   }
@@ -64,10 +65,26 @@ export default function ProductsPage() {
     setQuantities(prev => ({ ...prev, [productId]: val }))
   }
 
+  const handleInputBlur = (productId: string, unit: string) => {
+    const valStr = quantities[productId]
+    if (valStr !== undefined) {
+      let val = parseFloat(valStr)
+      const min = getQtyMin(unit)
+      if (isNaN(val) || val < min) {
+        val = min
+      } else {
+        const step = getQtyStep(unit)
+        val = Math.round(val / step) * step
+        if (val < min) val = min
+      }
+      setQuantities(prev => ({ ...prev, [productId]: String(val) }))
+    }
+  }
+
   const handleAddToCart = (p: Product) => {
-    const qtyStr = quantities[p.id] || '1'
-    let quantity = parseFloat(qtyStr)
     const min = getQtyMin(p.unit)
+    const qtyStr = quantities[p.id] !== undefined ? quantities[p.id] : String(min)
+    let quantity = parseFloat(qtyStr)
     if (isNaN(quantity) || quantity < min) {
       quantity = min
       setQuantities(prev => ({ ...prev, [p.id]: String(min) }))
@@ -79,9 +96,9 @@ export default function ProductsPage() {
   }
 
   const handleBuyNow = (p: Product) => {
-    const qtyStr = quantities[p.id] || '1'
-    let quantity = parseFloat(qtyStr)
     const min = getQtyMin(p.unit)
+    const qtyStr = quantities[p.id] !== undefined ? quantities[p.id] : String(min)
+    let quantity = parseFloat(qtyStr)
     if (isNaN(quantity) || quantity < min) {
       quantity = min
     }
@@ -805,8 +822,11 @@ export default function ProductsPage() {
                                 type="number"
                                 min={getQtyMin(p.unit)}
                                 step={getQtyStep(p.unit)}
-                                value={quantities[p.id] || '1'}
+                                value={quantities[p.id] !== undefined ? quantities[p.id] : String(getQtyMin(p.unit))}
                                 onChange={(e) => handleQtyInputChange(p.id, e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={() => handleInputBlur(p.id, p.unit)}
+                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                                 className="w-12 bg-transparent text-center text-slate-800 font-extrabold text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                               <span className="text-[10px] text-slate-400 font-extrabold uppercase ml-0.5">{p.unit}</span>
@@ -826,7 +846,9 @@ export default function ProductsPage() {
                             <span className="text-slate-400 font-semibold">Tạm tính:</span>
                             <span className="text-blue-600 font-extrabold">
                               {(() => {
-                                const qVal = parseFloat(quantities[p.id] || '1')
+                                const min = getQtyMin(p.unit)
+                                const currentStr = quantities[p.id] !== undefined ? quantities[p.id] : String(min)
+                                const qVal = parseFloat(currentStr)
                                 if (isNaN(qVal) || qVal <= 0) return '0đ'
                                 return (p.price * qVal).toLocaleString('vi-VN') + 'đ'
                               })()}

@@ -70,12 +70,12 @@ export default function FeedbackPage() {
     <div className="w-full max-w-2xl mt-6 mb-20 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* Page Header */}
-      <div className="text-center mb-8 w-full px-2">
+      <div className="flex flex-col items-center text-center mb-8 w-full px-2">
         <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100/70 shadow-sm transition-transform">
           <MessageSquare className="w-7 h-7 text-blue-600" />
         </div>
         <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Góp ý & Đánh giá</h1>
-        <p className="text-slate-500 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+        <p className="text-slate-500 text-sm sm:text-base max-w-md leading-relaxed text-center" style={{ textAlign: 'center' }}>
           Đánh giá chất lượng dịch vụ và để lại góp ý giúp chúng tôi phục vụ bạn tốt hơn từng ngày.
         </p>
       </div>
