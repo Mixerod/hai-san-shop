@@ -46,8 +46,8 @@ export default function ProductsPage() {
   const handleDecreaseQty = (productId: string, unit: string) => {
     const step = getQtyStep(unit)
     const min = getQtyMin(unit)
-    const currentStr = quantities[productId] !== undefined ? quantities[productId] : String(min)
-    const currentVal = parseFloat(currentStr) || min
+    const currentStr = quantities[productId] !== undefined ? quantities[productId] : String(Math.max(1, min))
+    const currentVal = parseFloat(currentStr) || Math.max(1, min)
     const newVal = Math.max(min, Math.round((currentVal - step) * 10) / 10)
     setQuantities(prev => ({ ...prev, [productId]: String(newVal) }))
   }
@@ -55,8 +55,8 @@ export default function ProductsPage() {
   const handleIncreaseQty = (productId: string, unit: string) => {
     const step = getQtyStep(unit)
     const min = getQtyMin(unit)
-    const currentStr = quantities[productId] !== undefined ? quantities[productId] : String(min)
-    const currentVal = parseFloat(currentStr) || min
+    const currentStr = quantities[productId] !== undefined ? quantities[productId] : String(Math.max(1, min))
+    const currentVal = parseFloat(currentStr) || Math.max(1, min)
     const newVal = Math.round((currentVal + step) * 10) / 10
     setQuantities(prev => ({ ...prev, [productId]: String(newVal) }))
   }
@@ -83,7 +83,7 @@ export default function ProductsPage() {
 
   const handleAddToCart = (p: Product) => {
     const min = getQtyMin(p.unit)
-    const qtyStr = quantities[p.id] !== undefined ? quantities[p.id] : String(min)
+    const qtyStr = quantities[p.id] !== undefined ? quantities[p.id] : String(Math.max(1, min))
     let quantity = parseFloat(qtyStr)
     if (isNaN(quantity) || quantity < min) {
       quantity = min
@@ -97,7 +97,7 @@ export default function ProductsPage() {
 
   const handleBuyNow = (p: Product) => {
     const min = getQtyMin(p.unit)
-    const qtyStr = quantities[p.id] !== undefined ? quantities[p.id] : String(min)
+    const qtyStr = quantities[p.id] !== undefined ? quantities[p.id] : String(Math.max(1, min))
     let quantity = parseFloat(qtyStr)
     if (isNaN(quantity) || quantity < min) {
       quantity = min
@@ -822,7 +822,7 @@ export default function ProductsPage() {
                                 type="number"
                                 min={getQtyMin(p.unit)}
                                 step={getQtyStep(p.unit)}
-                                value={quantities[p.id] !== undefined ? quantities[p.id] : String(getQtyMin(p.unit))}
+                                value={quantities[p.id] !== undefined ? quantities[p.id] : String(Math.max(1, getQtyMin(p.unit)))}
                                 onChange={(e) => handleQtyInputChange(p.id, e.target.value)}
                                 onFocus={(e) => e.target.select()}
                                 onBlur={() => handleInputBlur(p.id, p.unit)}
@@ -847,7 +847,7 @@ export default function ProductsPage() {
                             <span className="text-blue-600 font-extrabold">
                               {(() => {
                                 const min = getQtyMin(p.unit)
-                                const currentStr = quantities[p.id] !== undefined ? quantities[p.id] : String(min)
+                                const currentStr = quantities[p.id] !== undefined ? quantities[p.id] : String(Math.max(1, min))
                                 const qVal = parseFloat(currentStr)
                                 if (isNaN(qVal) || qVal <= 0) return '0đ'
                                 return (p.price * qVal).toLocaleString('vi-VN') + 'đ'
