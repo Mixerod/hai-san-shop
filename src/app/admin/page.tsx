@@ -989,29 +989,28 @@ export default function AdminPage() {
                         key={order.id}
                         className="hover:bg-gray-50 transition-colors group"
                       >
-                        <td className="px-6 py-5">
+                        <td className="px-3 md:px-6 py-4 md:py-5">
                           <input 
                             type="checkbox" 
                             checked={selectedOrderIds.has(order.id)}
                             onChange={() => toggleSelectOrder(order.id)}
-                            className="w-4 h-4 cursor-pointer accent-blue-600"
+                            className="w-5 h-5 cursor-pointer accent-blue-600"
                           />
                         </td>
-                        <td className="px-6 py-5 whitespace-nowrap font-mono text-gray-500 font-medium text-xs">
+                        <td className="px-4 md:px-6 py-4 md:py-5 whitespace-nowrap font-mono text-gray-500 font-medium text-xs">
                           #{order.id.slice(0, 8).toUpperCase()}
                         </td>
-                        <td className="px-6 py-5">
+                        <td className="px-4 md:px-6 py-4 md:py-5 whitespace-normal break-words min-w-[200px]">
                           <p className="font-bold text-gray-900">
                             {order.profiles?.full_name || "Khách (Xem ghi chú)"}
                           </p>
                           <p
-                            className="text-xs text-gray-500 mt-1 line-clamp-2 max-w-[200px]"
-                            title={order.note}
+                            className="text-xs text-gray-500 mt-1 break-words whitespace-normal"
                           >
                             {order.note || "Không có ghi chú"}
                           </p>
                         </td>
-                        <td className="px-6 py-5 min-w-[280px]">
+                        <td className="px-4 md:px-6 py-4 md:py-5 min-w-[220px]">
                           <ul className="space-y-1.5">
                             {order.order_items?.map((item) => (
                               <li
@@ -1022,9 +1021,8 @@ export default function AdminPage() {
                                   {item.products?.name || "SP"}
                                 </span>{" "}
                                 <span className="text-gray-500">
-                                  (x{item.quantity} -{" "}
-                                  {item.price_at_time.toLocaleString("vi-VN")}đ/
-                                  {item.products?.unit || "kg"})
+                                  (x{item.quantity} {item.products?.unit || "kg"} -{" "}
+                                  {item.price_at_time.toLocaleString("vi-VN")}đ)
                                 </span>
                               </li>
                             ))}
@@ -1149,8 +1147,9 @@ export default function AdminPage() {
               <button 
                 onClick={() => window.print()}
                 className="px-5 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold rounded-lg transition-colors border border-orange-200 shadow-sm text-sm print:hidden flex items-center gap-2"
+                title="Bấm để in danh sách này ra giấy"
               >
-                🖨️ In bảng kế hoạch
+                🖨️ In Phiếu Làm Hàng
               </button>
             </div>
 
@@ -1231,31 +1230,39 @@ export default function AdminPage() {
               <h3 className="font-bold text-gray-800 border-b border-gray-200 pb-2 mb-4 text-lg mt-8">
                 Chi tiết đơn hàng thuộc mẻ này ({preparationData.includedOrders.length} đơn)
               </h3>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:grid-cols-2 print:gap-3">
                 {preparationData.includedOrders.length === 0 && (
-                  <p className="text-gray-500 italic">Chưa có đơn hàng nào cần chuẩn bị.</p>
+                  <p className="text-gray-500 italic col-span-full">Chưa có đơn hàng nào cần chuẩn bị.</p>
                 )}
                 {preparationData.includedOrders.map((order, index) => (
-                  <div key={order.id} className="flex flex-col sm:flex-row gap-4 justify-between bg-white border border-gray-200 rounded-lg p-4 shadow-sm break-inside-avoid">
-                    <div>
-                      <p className="font-mono text-xs font-bold text-gray-400">#{(index + 1).toString().padStart(2, '0')} - MÃ ĐƠN: {order.id.slice(0,8).toUpperCase()}</p>
+                  <div key={order.id} className="flex flex-col sm:flex-row gap-3 bg-white border border-gray-200 print:border-gray-300 rounded-lg p-3 sm:p-4 shadow-sm print:shadow-none break-inside-avoid">
+                    <div className="sm:w-1/2">
+                      <p className="font-mono text-xs font-bold text-gray-400 print:text-gray-500">
+                        #{(index + 1).toString().padStart(2, '0')} - MÃ: {order.id.slice(0,6).toUpperCase()}
+                      </p>
                       {showCustomerNames && (
-                        <p className="font-bold text-gray-800 mt-1">{order.profiles?.full_name || 'Khách (Xem ghi chú)'}</p>
+                        <p className="font-bold text-gray-800 mt-1 print:text-black">
+                          {order.profiles?.full_name || 'Khách (Xem ghi chú)'}
+                        </p>
                       )}
-                      <p className="text-xs text-gray-500 mt-0.5">{new Date(order.created_at).toLocaleString('vi-VN')}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5 print:text-gray-600">
+                        {new Date(order.created_at).toLocaleString('vi-VN')}
+                      </p>
                       {order.note && showCustomerNames && (
-                        <p className="text-xs text-gray-600 mt-1 max-w-[200px] italic">Ghi chú: {order.note}</p>
+                        <p className="text-xs text-gray-700 mt-1 italic break-words whitespace-normal print:text-black">
+                          Ghi chú: {order.note}
+                        </p>
                       )}
                     </div>
-                    <div className="flex-1 max-w-md">
+                    <div className="flex-1 border-t sm:border-t-0 sm:border-l border-gray-100 print:border-gray-200 pt-2 sm:pt-0 sm:pl-3">
                       <ul className="text-sm space-y-1">
                         {order.order_items.map(item => {
                           const pName = item.products?.name || 'SP'
                           if (prepProductFilter !== 'all' && pName !== prepProductFilter) return null
                           return (
-                            <li key={item.id} className="flex justify-between border-b border-gray-100 last:border-0 pb-1">
-                              <span className="text-gray-700">{pName}</span>
-                              <span className="font-bold text-gray-900">{item.quantity} {item.products?.unit}</span>
+                            <li key={item.id} className="flex justify-between border-b border-gray-100 print:border-gray-200 last:border-0 pb-1">
+                              <span className="text-gray-700 print:text-black text-xs font-medium">{pName}</span>
+                              <span className="font-bold text-gray-900 print:text-black text-xs">{item.quantity} {item.products?.unit}</span>
                             </li>
                           )
                         })}
