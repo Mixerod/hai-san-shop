@@ -14,7 +14,11 @@ import {
   Filter,
   Copy,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Megaphone,
+  Send,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 
 type OrderItem = {
@@ -56,6 +60,43 @@ export default function AdminPage() {
   const [exporting, setExporting] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  // Global Broadcast states
+  const [globalMessage, setGlobalMessage] = useState('')
+  const [globalType, setGlobalType] = useState<'general' | 'new_product' | 'price_change'>('general')
+  const [sendingBroadcast, setSendingBroadcast] = useState(false)
+  const [showGlobalPanel, setShowGlobalPanel] = useState(true)
+
+  async function handleSendNotification(messageText: string, typeVal: string) {
+    if (!messageText.trim()) return
+    
+    setSendingBroadcast(true)
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          message: messageText,
+          type: typeVal,
+          created_at: new Date().toISOString()
+        })
+
+      if (error) {
+        if (error.message.includes('relation') && error.message.includes('does not exist')) {
+          alert('💡 Chào Quyết! Tính năng gửi thông báo yêu cầu có bảng "notifications" trong database.\n\nBạn vui lòng mở Supabase Dashboard -> SQL Editor và chạy đoạn code sau để tạo bảng:\n\nCREATE TABLE public.notifications (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  message text NOT NULL,\n  type text DEFAULT \'general\',\n  created_at timestamptz DEFAULT now() NOT NULL\n);\nALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Allow anon select" ON public.notifications FOR SELECT USING (true);\nCREATE POLICY "Allow admin all" ON public.notifications FOR ALL USING (true);')
+          return
+        }
+        throw error
+      }
+
+      showToast('Đã phát thông báo thành công! ⚡')
+      setGlobalMessage('')
+    } catch (err: any) {
+      console.error(err)
+      alert('Lỗi khi gửi thông báo: ' + err.message)
+    } finally {
+      setSendingBroadcast(false)
+    }
+  }
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -414,6 +455,89 @@ export default function AdminPage() {
               <h2 className="text-2xl font-bold text-gray-900">{summary.totalCustomers} người</h2>
             </div>
           </div>
+        </div>
+
+        {/* Bảng phát tin nhanh cho Admin Dashboard */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-250 p-6 relative overflow-hidden animate-in fade-in duration-300">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+          
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
+                <Megaphone className="w-5 h-5 text-blue-600 animate-bounce" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Bảng Phát Tin Nhanh</h2>
+                <p className="text-xs text-gray-500 font-medium">Gửi thông báo real-time tới tất cả khách hàng</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowGlobalPanel(!showGlobalPanel)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-all"
+            >
+              {showGlobalPanel ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </button>
+          </div>
+
+          {showGlobalPanel && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Loại thông báo</label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {[
+                    { id: 'general', label: '📢 Thông báo chung', bg: 'bg-blue-50 border-blue-100 text-blue-700 hover:bg-blue-100/50' },
+                    { id: 'new_product', label: '🐟 Có cá mới nà', bg: 'bg-green-50 border-green-100 text-green-700 hover:bg-green-100/50' },
+                    { id: 'price_change', label: '🏷️ Có đổi giá nè', bg: 'bg-amber-50 border-amber-100 text-amber-700 hover:bg-amber-100/50' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setGlobalType(t.id as any)}
+                      className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                        globalType === t.id
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/10'
+                          : t.bg
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nội dung tin nhắn</label>
+                <textarea
+                  rows={2}
+                  value={globalMessage}
+                  onChange={(e) => setGlobalMessage(e.target.value)}
+                  placeholder="Nhập nội dung cần thông báo cho khách hàng... (Ví dụ: Có cá hồi tươi Phan Thiết vừa cập bến nà cả nhà ơi!)"
+                  className="w-full bg-gray-50 border border-gray-250 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-sm font-semibold leading-relaxed transition-all shadow-inner"
+                />
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  disabled={sendingBroadcast || !globalMessage.trim()}
+                  onClick={() => handleSendNotification(globalMessage, globalType)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm px-6 py-2.5 rounded-lg transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center gap-2 border border-blue-600/10 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                >
+                  {sendingBroadcast ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Đang gửi tin...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Phát tin ngay 🚀</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Action Bar: Filters */}
