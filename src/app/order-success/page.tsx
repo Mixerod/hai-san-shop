@@ -35,6 +35,7 @@ function OrderSuccessContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [copyToast, setCopyToast] = useState('')
 
   useEffect(() => {
     if (!orderId) {
@@ -54,6 +55,19 @@ function OrderSuccessContent() {
         if (error) throw error
         if (data) {
           setOrder(data as any)
+          
+          // Tự động copy số tài khoản khi đơn hàng là chuyển khoản
+          if (data.payment_method === 'transfer') {
+            try {
+              navigator.clipboard.writeText('4801205175150')
+              setCopyToast('Đã tự động sao chép số tài khoản Agribank: 4801205175150!')
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+              setTimeout(() => setCopyToast(''), 4000)
+            } catch (err) {
+              console.warn('Auto copy failed on load', err)
+            }
+          }
           
           // Trigger Confetti Wow Effect
           const script = document.createElement('script')
@@ -99,7 +113,9 @@ function OrderSuccessContent() {
   const copyToClipboard = () => {
     navigator.clipboard.writeText('4801205175150')
     setCopied(true)
+    setCopyToast('Đã copy số tài khoản Agribank: 4801205175150!')
     setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopyToast(''), 3000)
   }
 
   if (loading) {
@@ -280,6 +296,13 @@ function OrderSuccessContent() {
           <ChevronRight className="w-6 h-6" />
         </Link>
       </div>
+      {/* Custom Toast Alert */}
+      {copyToast && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white text-xs sm:text-sm px-6 py-3.5 rounded-2xl shadow-2xl z-[99] border border-blue-500/30 flex items-center gap-2.5 font-bold animate-in fade-in slide-in-from-bottom-5 duration-300 w-[90%] max-w-sm text-center justify-center">
+          <span className="bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 animate-bounce">⚡</span>
+          <span>{copyToast}</span>
+        </div>
+      )}
     </div>
     </div>
   )

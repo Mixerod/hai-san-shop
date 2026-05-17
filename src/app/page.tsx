@@ -7,10 +7,16 @@ import HeroSection from '@/components/HeroSection'
 export default function HomePage() {
   const [activePolicy, setActivePolicy] = useState<string | null>(null)
   const [hasAutoOpened, setHasAutoOpened] = useState(false)
+  const [copyToast, setCopyToast] = useState('')
   const sectionRef = useRef<HTMLElement>(null)
   
   const touchStartTimes = useRef<Record<string, number>>({})
   const activeBeforeTouch = useRef<Record<string, boolean>>({})
+  const touchMoved = useRef<Record<string, boolean>>({})
+  const touchStartX = useRef<Record<string, number>>({})
+  const touchStartY = useRef<Record<string, number>>({})
+  const holdTimer = useRef<Record<string, NodeJS.Timeout | null>>({})
+  const isHolding = useRef<Record<string, boolean>>({})
 
   // Staggered auto-open sequence on scroll (mobile only)
   useEffect(() => {
@@ -54,25 +60,62 @@ export default function HomePage() {
     return () => observer.disconnect()
   }, [hasAutoOpened])
 
-  const handleTouchStart = (id: string) => {
+  const handleTouchStart = (e: React.TouchEvent, id: string) => {
     touchStartTimes.current[id] = Date.now()
+    touchMoved.current[id] = false
+    touchStartX.current[id] = e.touches[0].clientX
+    touchStartY.current[id] = e.touches[0].clientY
     activeBeforeTouch.current[id] = activePolicy === id
-    setActivePolicy(id)
+    isHolding.current[id] = false
+
+    if (holdTimer.current[id]) clearTimeout(holdTimer.current[id])
+    holdTimer.current[id] = setTimeout(() => {
+      if (!touchMoved.current[id]) {
+        setActivePolicy(id)
+        isHolding.current[id] = true
+      }
+    }, 350)
   }
 
-  const handleTouchEnd = (id: string) => {
-    const duration = Date.now() - (touchStartTimes.current[id] || 0)
-    if (duration > 350) {
-      // Press & hold release -> hide instantly
-      setActivePolicy(null)
-    } else {
-      // Quick tap -> toggle
-      if (activeBeforeTouch.current[id]) {
-        setActivePolicy(null)
-      } else {
-        setActivePolicy(id)
+  const handleTouchMove = (e: React.TouchEvent, id: string) => {
+    const dx = e.touches[0].clientX - (touchStartX.current[id] || 0)
+    const dy = e.touches[0].clientY - (touchStartY.current[id] || 0)
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      touchMoved.current[id] = true
+      if (holdTimer.current[id]) {
+        clearTimeout(holdTimer.current[id])
+        holdTimer.current[id] = null
       }
     }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent, id: string) => {
+    // Ngăn chặn sự kiện onClick mô phỏng từ trình duyệt gây double-trigger
+    e.preventDefault()
+
+    if (holdTimer.current[id]) {
+      clearTimeout(holdTimer.current[id])
+      holdTimer.current[id] = null
+    }
+
+    if (touchMoved.current[id]) {
+      return // Đang cuộn màn hình, không kích hoạt
+    }
+
+    if (isHolding.current[id]) {
+      setActivePolicy(null)
+      isHolding.current[id] = false
+    } else {
+      // Nhấp nhanh -> Đổi trạng thái
+      setActivePolicy(prev => prev === id ? null : id)
+    }
+  }
+
+  const handleCopyPayment = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText('4801205175150')
+    setCopyToast('Đã copy Số tài khoản Agribank: 4801205175150 & số điện thoại Momo: 0964671009!')
+    setTimeout(() => setCopyToast(''), 3000)
   }
 
   return (
@@ -96,10 +139,10 @@ export default function HomePage() {
           <div className="grid grid-cols-3 gap-4">
             {/* Delivery */}
             <div 
-              onTouchStart={() => handleTouchStart('delivery')}
-              onTouchEnd={() => handleTouchEnd('delivery')}
+              onTouchStart={(e) => handleTouchStart(e, 'delivery')}
+              onTouchMove={(e) => handleTouchMove(e, 'delivery')}
+              onTouchEnd={(e) => handleTouchEnd(e, 'delivery')}
               onClick={() => {
-                // For desktop clicks or standard click fallback
                 if (window.innerWidth >= 768) return
                 setActivePolicy(prev => prev === 'delivery' ? null : 'delivery')
               }}
@@ -126,8 +169,9 @@ export default function HomePage() {
 
             {/* Payment */}
             <div 
-              onTouchStart={() => handleTouchStart('payment')}
-              onTouchEnd={() => handleTouchEnd('payment')}
+              onTouchStart={(e) => handleTouchStart(e, 'payment')}
+              onTouchMove={(e) => handleTouchMove(e, 'payment')}
+              onTouchEnd={(e) => handleTouchEnd(e, 'payment')}
               onClick={() => {
                 if (window.innerWidth >= 768) return
                 setActivePolicy(prev => prev === 'payment' ? null : 'payment')
@@ -147,16 +191,29 @@ export default function HomePage() {
                   activePolicy === 'payment' ? 'max-h-48 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0 group-hover:max-h-48 group-hover:opacity-100 group-hover:mt-2'
                 }`}
               >
-                Linh hoạt COD hoặc chuyển khoản nhanh chóng, uy tín 100%. Thông tin tài khoản: <br />
-                <span className="font-bold text-blue-600">Agribank: 4801205175150</span> <br />
-                <span className="font-bold text-blue-600">LÊ MINH QUYẾT / Momo: 0964671009</span>
+                Linh hoạt COD hoặc chuyển khoản nhanh chóng, uy tín 100%. Thông tin tài khoản (chạm để copy): <br />
+                <span 
+                  onClick={handleCopyPayment}
+                  onTouchEnd={handleCopyPayment}
+                  className="font-bold text-blue-600 bg-blue-50 border border-blue-200/50 rounded px-1.5 py-0.5 mt-1 inline-block cursor-pointer hover:bg-blue-100 hover:text-blue-700 active:scale-95 transition-all select-all"
+                >
+                  Agribank: 4801205175150
+                </span> <br />
+                <span 
+                  onClick={handleCopyPayment}
+                  onTouchEnd={handleCopyPayment}
+                  className="font-bold text-blue-600 bg-blue-50 border border-blue-200/50 rounded px-1.5 py-0.5 mt-1 inline-block cursor-pointer hover:bg-blue-100 hover:text-blue-700 active:scale-95 transition-all select-all"
+                >
+                  LÊ MINH QUYẾT / Momo: 0964671009
+                </span>
               </div>
             </div>
 
             {/* Quality */}
             <div 
-              onTouchStart={() => handleTouchStart('quality')}
-              onTouchEnd={() => handleTouchEnd('quality')}
+              onTouchStart={(e) => handleTouchStart(e, 'quality')}
+              onTouchMove={(e) => handleTouchMove(e, 'quality')}
+              onTouchEnd={(e) => handleTouchEnd(e, 'quality')}
               onClick={() => {
                 if (window.innerWidth >= 768) return
                 setActivePolicy(prev => prev === 'quality' ? null : 'quality')
@@ -196,6 +253,14 @@ export default function HomePage() {
           <p className="text-blue-600 font-bold uppercase tracking-widest text-xs pt-2">Trân trọng cảm ơn!</p>
         </div>
       </section>
+
+      {/* Reusable Toast Notification */}
+      {copyToast && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white text-xs sm:text-sm px-6 py-3.5 rounded-2xl shadow-2xl z-[99] border border-blue-500/30 flex items-center gap-2.5 font-bold animate-in fade-in slide-in-from-bottom-5 duration-300 w-[90%] max-w-sm text-center justify-center">
+          <span className="bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 animate-bounce">⚡</span>
+          <span>{copyToast}</span>
+        </div>
+      )}
     </div>
   )
 }

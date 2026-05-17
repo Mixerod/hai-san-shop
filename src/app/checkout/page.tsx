@@ -37,6 +37,17 @@ function CheckoutForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasHydrated, setHasHydrated] = useState(false)
+  const [copyToast, setCopyToast] = useState('')
+
+  const handleCopyBank = () => {
+    try {
+      navigator.clipboard.writeText('4801205175150')
+      setCopyToast('Đã copy số tài khoản Agribank: 4801205175150!')
+      setTimeout(() => setCopyToast(''), 3000)
+    } catch (err) {
+      console.error('Failed to copy', err)
+    }
+  }
 
   useEffect(() => {
     setHasHydrated(true)
@@ -70,6 +81,13 @@ function CheckoutForm() {
     setError('')
 
     try {
+      if (paymentMethod === 'transfer') {
+        try {
+          navigator.clipboard.writeText('4801205175150')
+        } catch (clipErr) {
+          console.warn('Clipboard write failed', clipErr)
+        }
+      }
       let deliveryDetail = ''
       if (deliveryMethod === 'company') {
         deliveryDetail = 'Tại công ty'
@@ -328,14 +346,20 @@ function CheckoutForm() {
 
             {/* Bank details */}
             <div className={`overflow-hidden transition-all duration-300 ${paymentMethod === 'transfer' ? 'max-h-64 mt-4' : 'max-h-0'}`}>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center">
-                <p className="text-sm text-slate-500 mb-3">Vui lòng chuyển khoản với thông tin:</p>
-                <div className="inline-block text-left bg-white rounded-lg p-4 mb-4 border border-slate-200">
+              <div 
+                onClick={handleCopyBank}
+                className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center cursor-pointer hover:bg-slate-100/70 transition-colors select-none group relative"
+                title="Chạm để copy nhanh thông tin chuyển khoản"
+              >
+                <p className="text-sm text-slate-500 mb-3 group-hover:text-blue-600 font-semibold transition-colors">
+                  👉 Chạm để copy thông tin chuyển khoản:
+                </p>
+                <div className="inline-block text-left bg-white rounded-lg p-4 mb-4 border border-slate-200 group-hover:border-blue-300 shadow-sm transition-all active:scale-98">
                   <p className="font-semibold text-base text-green-600">Agribank</p>
-                  <p className="font-mono text-xl tracking-wider text-slate-900 my-1">4801205175150</p>
+                  <p className="font-mono text-xl tracking-wider text-slate-900 my-1 font-bold">4801205175150</p>
                   <p className="text-slate-700 font-semibold">LÊ MINH QUYẾT</p>
                 </div>
-                <div className="bg-blue-50 border border-blue-100 py-2.5 px-4 rounded-lg inline-flex items-center justify-center gap-2">
+                <div className="bg-blue-50 border border-blue-100 py-2.5 px-4 rounded-lg inline-flex items-center justify-center gap-2 block max-w-xs mx-auto">
                   <span className="text-sm text-slate-600">Nội dung CK:</span>
                   <span className="font-bold text-blue-600">{phone || '(Vui lòng nhập SĐT)'}</span>
                 </div>
@@ -385,6 +409,14 @@ function CheckoutForm() {
           </button>
 
         </form>
+
+        {/* Custom Toast Alert */}
+        {copyToast && (
+          <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white text-xs sm:text-sm px-6 py-3.5 rounded-2xl shadow-2xl z-[99] border border-blue-500/30 flex items-center gap-2.5 font-bold animate-in fade-in slide-in-from-bottom-5 duration-300 w-[90%] max-w-sm text-center justify-center">
+            <span className="bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 animate-bounce">⚡</span>
+            <span>{copyToast}</span>
+          </div>
+        )}
       </div>
     </div>
   )
