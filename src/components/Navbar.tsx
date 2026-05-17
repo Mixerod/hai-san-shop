@@ -226,8 +226,8 @@ export default function Navbar() {
           {/* Actions */}
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             
-            {/* Desktop Notification Bell */}
-            <div className="relative hidden md:block">
+            {/* Notification Bell (Visible on all devices) */}
+            <div className="relative">
               <button
                 onClick={handleToggleNotifications}
                 className={`p-3 rounded-xl transition-all duration-300 relative border cursor-pointer ${
@@ -246,7 +246,7 @@ export default function Navbar() {
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 bg-slate-950/95 backdrop-blur-xl border border-blue-900/40 rounded-2xl shadow-2xl p-4 z-[70] animate-in fade-in slide-in-from-top-3 duration-250">
+                <div className="absolute right-0 sm:right-0 -right-12 mt-3 w-[300px] sm:w-80 bg-slate-950/95 backdrop-blur-xl border border-blue-900/40 rounded-2xl shadow-2xl p-4 z-[70] animate-in fade-in slide-in-from-top-3 duration-250">
                   <div className="flex items-center justify-between pb-3 border-b border-blue-900/20 mb-3">
                     <span className="font-extrabold text-[10px] tracking-wider uppercase text-cyan-400">Thông báo của Quyết</span>
                     <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Realtime ⚡</span>
