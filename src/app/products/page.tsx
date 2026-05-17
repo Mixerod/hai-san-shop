@@ -4,9 +4,10 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/store/cart'
-import { Bell, Megaphone, Save, Send, ChevronDown, ChevronUp, Check, Loader2 } from 'lucide-react'
+import { Bell, Megaphone, Save, Send, ChevronDown, ChevronUp, Check, Loader2, ShoppingCart, Zap, Plus, Minus } from 'lucide-react'
 
 type Product = {
   id: string
@@ -22,12 +23,72 @@ type Product = {
 }
 
 export default function ProductsPage() {
+  const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<Product | null>(null)
-  const [qty, setQty] = useState('1')
+  const [quantities, setQuantities] = useState<Record<string, string>>({})
   const [added, setAdded] = useState<string | null>(null)
   const { add, items } = useCart()
+
+  // Quantity step and min helper functions
+  const getQtyStep = (unit: string) => {
+    const u = (unit || '').toLowerCase()
+    if (u.includes('kg') || u.includes('ký') || u.includes('ky') || u.includes('kg/')) {
+      return 0.5
+    }
+    return 1
+  }
+
+  const getQtyMin = (unit: string) => {
+    return getQtyStep(unit)
+  }
+
+  const handleDecreaseQty = (productId: string, unit: string) => {
+    const step = getQtyStep(unit)
+    const min = getQtyMin(unit)
+    const currentStr = quantities[productId] || '1'
+    const currentVal = parseFloat(currentStr) || min
+    const newVal = Math.max(min, Math.round((currentVal - step) * 10) / 10)
+    setQuantities(prev => ({ ...prev, [productId]: String(newVal) }))
+  }
+
+  const handleIncreaseQty = (productId: string, unit: string) => {
+    const step = getQtyStep(unit)
+    const currentStr = quantities[productId] || '1'
+    const currentVal = parseFloat(currentStr) || 1
+    const newVal = Math.round((currentVal + step) * 10) / 10
+    setQuantities(prev => ({ ...prev, [productId]: String(newVal) }))
+  }
+
+  const handleQtyInputChange = (productId: string, val: string) => {
+    setQuantities(prev => ({ ...prev, [productId]: val }))
+  }
+
+  const handleAddToCart = (p: Product) => {
+    const qtyStr = quantities[p.id] || '1'
+    let quantity = parseFloat(qtyStr)
+    const min = getQtyMin(p.unit)
+    if (isNaN(quantity) || quantity < min) {
+      quantity = min
+      setQuantities(prev => ({ ...prev, [p.id]: String(min) }))
+    }
+    
+    add({ id: p.id, name: p.name, price: p.price, unit: p.unit, quantity })
+    setAdded(p.id)
+    setTimeout(() => setAdded(null), 2000)
+  }
+
+  const handleBuyNow = (p: Product) => {
+    const qtyStr = quantities[p.id] || '1'
+    let quantity = parseFloat(qtyStr)
+    const min = getQtyMin(p.unit)
+    if (isNaN(quantity) || quantity < min) {
+      quantity = min
+    }
+    
+    add({ id: p.id, name: p.name, price: p.price, unit: p.unit, quantity })
+    router.push('/cart')
+  }
 
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0)
 
@@ -236,20 +297,7 @@ export default function ProductsPage() {
     }
   }
 
-  function openModal(p: Product) {
-    setSelected(p)
-    setQty('1')
-  }
 
-  function confirmAdd() {
-    if (!selected) return
-    const quantity = parseFloat(qty)
-    if (isNaN(quantity) || quantity <= 0) return
-    add({ id: selected.id, name: selected.name, price: selected.price, unit: selected.unit, quantity })
-    setAdded(selected.id)
-    setSelected(null)
-    setTimeout(() => setAdded(null), 2000)
-  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100">
@@ -638,18 +686,87 @@ export default function ProductsPage() {
                       </div>
                     )}
 
-                    <button
-                      disabled={!p.in_stock}
-                      onClick={() => openModal(p)}
-                      className="w-full bg-orange-500 hover:bg-orange-600 active:scale-95 disabled:bg-slate-100 disabled:text-slate-400 disabled:active:scale-100 disabled:cursor-not-allowed text-white font-black h-10 sm:h-auto py-0 sm:py-3.5 text-[10px] sm:text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-orange-500/10 hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center gap-1 sm:gap-2 border border-orange-600/10 cursor-pointer"
-                    >
-                      {p.in_stock ? (
-                        <>
-                          <span className="text-base sm:text-lg leading-none font-bold">+</span>
-                          <span>Thêm vào giỏ</span>
-                        </>
-                      ) : 'Hết hàng'}
-                    </button>
+                    {p.in_stock && (
+                      <div className="space-y-2.5 mt-2">
+                        {/* Quantity Selector Container */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-2xl p-1 shadow-inner group-hover:border-blue-500/20 transition-all">
+                            <button
+                              type="button"
+                              onClick={() => handleDecreaseQty(p.id, p.unit)}
+                              className="w-8 h-8 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 active:scale-90 text-slate-650 hover:text-blue-600 transition-all font-black flex items-center justify-center select-none shadow-sm cursor-pointer"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <div className="flex items-center justify-center flex-1">
+                              <input
+                                type="number"
+                                min={getQtyMin(p.unit)}
+                                step={getQtyStep(p.unit)}
+                                value={quantities[p.id] || '1'}
+                                onChange={(e) => handleQtyInputChange(p.id, e.target.value)}
+                                className="w-12 bg-transparent text-center text-slate-800 font-extrabold text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <span className="text-[10px] text-slate-400 font-extrabold uppercase ml-0.5">{p.unit}</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleIncreaseQty(p.id, p.unit)}
+                              className="w-8 h-8 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 active:scale-90 text-slate-650 hover:text-blue-600 transition-all font-black flex items-center justify-center select-none shadow-sm cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Dynamic price estimate */}
+                          <div className="flex justify-between items-center px-1 text-[10px]">
+                            <span className="text-slate-400 font-semibold">Tạm tính:</span>
+                            <span className="text-blue-600 font-extrabold">
+                              {(() => {
+                                const qVal = parseFloat(quantities[p.id] || '1')
+                                if (isNaN(qVal) || qVal <= 0) return '0đ'
+                                return (p.price * qVal).toLocaleString('vi-VN') + 'đ'
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons Row */}
+                        <div className="flex gap-2 w-full">
+                          {/* Add to Cart */}
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(p)}
+                            className="px-3 py-2.5 bg-blue-50 border border-blue-200/50 hover:bg-blue-100/80 text-blue-600 rounded-2xl transition-all flex items-center justify-center gap-1.5 shrink-0 active:scale-95 cursor-pointer shadow-sm"
+                            title="Thêm vào giỏ hàng"
+                          >
+                            <ShoppingCart className="w-4 h-4" />
+                            <span className="hidden sm:inline text-xs font-black whitespace-nowrap">Thêm giỏ</span>
+                          </button>
+                          
+                          {/* Buy Now */}
+                          <button
+                            type="button"
+                            onClick={() => handleBuyNow(p)}
+                            className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white font-extrabold py-2.5 rounded-2xl transition-all shadow-md shadow-orange-500/10 hover:shadow-lg hover:shadow-orange-500/20 flex items-center justify-center gap-1 text-[10px] sm:text-xs uppercase tracking-wider border border-orange-600/10 cursor-pointer"
+                          >
+                            <Zap className="w-3.5 h-3.5 fill-white animate-pulse" />
+                            <span>Mua ngay</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!p.in_stock && (
+                      <button
+                        disabled
+                        className="w-full bg-slate-150 text-slate-400 font-black py-3 rounded-2xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-200 cursor-not-allowed mt-2"
+                      >
+                        Hết hàng
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -662,59 +779,6 @@ export default function ProductsPage() {
         <div className="fixed top-24 right-6 bg-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-emerald-500/20 z-50 animate-in slide-in-from-right-8 font-semibold flex items-center gap-2 border border-emerald-400/20">
           <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</span>
           Đã thêm vào giỏ hàng
-        </div>
-      )}
-
-      {/* Modal nhập số lượng */}
-      {selected && (
-        <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 px-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null) }}
-        >
-          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 border border-blue-100">
-              <span className="text-3xl">🛒</span>
-            </div>
-            
-            <h2 className="text-2xl font-extrabold text-slate-800 mb-2">{selected.name}</h2>
-            <p className="text-blue-600 font-bold text-xl mb-4">{selected.price.toLocaleString('vi-VN')}đ<span className="text-base font-medium text-slate-500">/{selected.unit}</span></p>
-            
-            <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-gray-100">
-              <label className="text-slate-700 font-bold text-sm mb-3 block">Chọn số lượng mua ({selected.unit})</label>
-              <input
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 text-slate-900 font-bold text-lg focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-center shadow-sm"
-                autoFocus
-              />
-            </div>
-
-            {qty && !isNaN(parseFloat(qty)) && parseFloat(qty) > 0 && (
-              <div className="flex justify-between items-center mb-8 px-2">
-                <span className="text-slate-500 font-medium">Tạm tính:</span>
-                <span className="text-orange-500 font-black text-2xl">{(selected.price * parseFloat(qty)).toLocaleString('vi-VN')}đ</span>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setSelected(null)}
-                className="flex-[0.4] bg-white border-2 border-gray-100 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-gray-50 hover:border-gray-200 active:scale-95 transition-all"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={confirmAdd}
-                disabled={!qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0}
-                className="flex-[0.6] bg-orange-500 hover:bg-orange-600 active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 disabled:active:scale-100 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-orange-500/25 border border-orange-600/20"
-              >
-                Xác nhận
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </main>
