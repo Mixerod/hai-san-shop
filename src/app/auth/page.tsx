@@ -4,11 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Mail, Lock, Loader2, AlertCircle, CheckCircle2, User } from 'lucide-react'
 
 export default function AuthPage() {
   const router = useRouter()
-  // Đã giữ nguyên logic cũ
   const [isLogin, setIsLogin] = useState(true)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [identifier, setIdentifier] = useState('')
@@ -23,7 +22,6 @@ export default function AuthPage() {
     return `${input.trim().toLowerCase()}@user.haisanshop.com`
   }
 
-  // Đã giữ nguyên logic cũ - handleSubmit Supabase auth
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -93,7 +91,6 @@ export default function AuthPage() {
     }
   }
 
-  // Đã giữ nguyên logic cũ - toggleMode
   const toggleMode = () => {
     setIsLogin(!isLogin)
     setIsForgotPassword(false)
@@ -102,46 +99,57 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="w-full flex flex-col items-center justify-center px-4 py-16 min-h-[calc(100vh-64px)]">
-      <div className="w-full max-w-md animate-in fade-in zoom-in-95 duration-500">
+    <div className="w-full min-h-[92vh] flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-slate-950">
+      
+      {/* Premium Ocean Background Shimmers */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
+      
+      {/* Decorative Wave Sweeper Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(15,23,42,0.1),rgba(2,6,23,0.85))] pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10 animate-in fade-in zoom-in-95 duration-500">
 
         {/* Back link */}
         <Link
           href="/"
-          className="group inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors mb-8"
+          className="group inline-flex items-center gap-2.5 text-sm font-extrabold uppercase tracking-wider text-slate-400 hover:text-cyan-400 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Quay lại trang chủ
         </Link>
 
-        {/* Card */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+        {/* Glassmorphism Card */}
+        <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl border border-slate-800 p-8 sm:p-10 shadow-[0_25px_60px_rgba(2,6,23,0.9)] relative overflow-hidden">
+          
+          {/* Subtle top light glow */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent pointer-events-none" />
 
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
-              <Lock className="w-7 h-7 text-blue-600" />
+            <div className="w-16 h-16 bg-cyan-950/60 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)] animate-pulse">
+              <Lock className="w-7 h-7 text-cyan-400" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-1">
-              {isForgotPassword ? 'Khôi phục mật khẩu' : isLogin ? 'Chào mừng trở lại!' : 'Tạo tài khoản mới'}
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mb-2">
+              {isForgotPassword ? 'Khôi phục mật khẩu' : isLogin ? 'Chào mừng trở lại!' : 'Đăng ký tài khoản'}
             </h1>
-            <p className="text-slate-500 text-sm">
+            <p className="text-slate-400 text-sm leading-relaxed">
               {isForgotPassword 
                 ? 'Nhập tên đăng nhập hoặc email để nhận liên kết khôi phục' 
-                : isLogin ? 'Đăng nhập để quản lý đơn hàng của bạn' : 'Tham gia để nhận những ưu đãi tốt nhất'}
+                : isLogin ? 'Đăng nhập để lưu và quản lý đơn hàng của bạn' : 'Đăng ký nhanh chóng để mua sắm dễ dàng'}
             </p>
           </div>
 
           {/* Tab toggle */}
           {!isForgotPassword && (
-            <div className="flex p-1 bg-slate-100 rounded-xl mb-8">
+            <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-2xl mb-8">
               <button
                 type="button"
                 onClick={() => !isLogin && toggleMode()}
-                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 cursor-pointer ${
                   isLogin
-                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                    : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 Đăng nhập
@@ -149,10 +157,10 @@ export default function AuthPage() {
               <button
                 type="button"
                 onClick={() => isLogin && toggleMode()}
-                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 cursor-pointer ${
                   !isLogin
-                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                    : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 Đăng ký
@@ -162,44 +170,48 @@ export default function AuthPage() {
 
           {/* Alerts */}
           {error && (
-            <div className="mb-5 flex items-start gap-3 bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-sm animate-in fade-in slide-in-from-top-2">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <p>{error}</p>
+            <div className="mb-6 flex items-start gap-3 bg-red-950/40 border border-red-500/30 text-red-300 p-4 rounded-2xl text-sm shadow-[0_0_15px_rgba(239,68,68,0.1)] animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="w-5.5 h-5.5 flex-shrink-0 text-red-400 mt-0.5" />
+              <p className="leading-relaxed font-semibold">{error}</p>
             </div>
           )}
           {successMsg && (
-            <div className="mb-5 flex items-start gap-3 bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl text-sm animate-in fade-in slide-in-from-top-2">
-              <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <p>{successMsg}</p>
+            <div className="mb-6 flex items-start gap-3 bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 p-4 rounded-2xl text-sm shadow-[0_0_15px_rgba(16,185,129,0.1)] animate-in fade-in slide-in-from-top-2">
+              <CheckCircle2 className="w-5.5 h-5.5 flex-shrink-0 text-emerald-400 mt-0.5" />
+              <p className="leading-relaxed font-semibold">{successMsg}</p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
 
             {/* Email/Username */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-700">Tên đăng nhập hoặc Email</label>
+            <div className="space-y-2">
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-400">
+                Tên đăng nhập hoặc Email
+              </label>
               <input
                 required
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-sm"
-                placeholder="Nhập tên đăng nhập hoặc email..."
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-2xl px-6 h-14 text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-400 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]"
+                placeholder="Ví dụ: chamuc hoặc email..."
               />
             </div>
 
             {/* Password */}
             {!isForgotPassword && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-sm font-semibold text-slate-700">Mật khẩu</label>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400">
+                    Mật khẩu
+                  </label>
                   {isLogin && (
                     <button
                       type="button"
                       onClick={() => { setIsForgotPassword(true); setError(''); setSuccessMsg(''); }}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+                      className="text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline transition-all cursor-pointer"
                     >
                       Quên mật khẩu?
                     </button>
@@ -211,7 +223,7 @@ export default function AuthPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   minLength={6}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-sm"
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-2xl px-6 h-14 text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-400 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]"
                   placeholder="Tối thiểu 6 ký tự"
                 />
               </div>
@@ -219,15 +231,17 @@ export default function AuthPage() {
 
             {/* Confirm Password (register only) */}
             {!isLogin && !isForgotPassword && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-sm font-semibold text-slate-700">Xác nhận mật khẩu</label>
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-400">
+                  Xác nhận mật khẩu
+                </label>
                 <input
                   required={!isLogin && !isForgotPassword}
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   minLength={6}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-sm"
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-2xl px-6 h-14 text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-400 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]"
                   placeholder="Nhập lại mật khẩu"
                 />
               </div>
@@ -237,7 +251,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:scale-[0.98] disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all mt-2 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
+              className="w-full h-14 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 active:scale-[0.98] disabled:from-slate-850 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-black uppercase tracking-widest text-sm rounded-2xl transition-all mt-4 shadow-xl shadow-orange-500/25 hover:shadow-orange-500/40 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -245,7 +259,7 @@ export default function AuthPage() {
                   <span>Đang xử lý...</span>
                 </>
               ) : (
-                <span>{isForgotPassword ? 'Gửi liên kết khôi phục' : isLogin ? 'Đăng nhập' : 'Tạo tài khoản'}</span>
+                <span>{isForgotPassword ? 'Gửi liên kết' : isLogin ? 'Đăng nhập ngay' : 'Đăng ký ngay'}</span>
               )}
             </button>
 
@@ -254,7 +268,7 @@ export default function AuthPage() {
                 <button
                   type="button"
                   onClick={() => { setIsForgotPassword(false); setError(''); setSuccessMsg(''); }}
-                  className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+                  className="text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white transition-all cursor-pointer"
                 >
                   Quay lại đăng nhập
                 </button>

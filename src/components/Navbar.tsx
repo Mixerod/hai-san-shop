@@ -391,9 +391,9 @@ export default function Navbar() {
                   className={`rounded-full text-xs font-bold tracking-wide uppercase leading-none transition-all duration-300 ${customClasses}`}
                 >
                   {link.href === '/feedback' ? (
-                    <span className="text-gold-gradient flex items-center gap-1">✨ {link.name}</span>
+                    <span className="text-gold-gradient">{link.name}</span>
                   ) : link.href === '/products' ? (
-                    <span className="text-cyan-gradient flex items-center gap-1">🐟 {link.name}</span>
+                    <span className="text-cyan-gradient">{link.name}</span>
                   ) : (
                     link.name
                   )}
@@ -404,6 +404,19 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
+            
+            {/* Mobile "Săn hải sản" Button (Extremely neat and compact) */}
+            <Link
+              href="/feedback"
+              style={{ padding: '8px 16px' }}
+              className={`md:hidden flex items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 border sparkle-gold-btn ${
+                isActive('/feedback')
+                  ? 'bg-amber-950/60 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.25)] text-amber-350'
+                  : 'bg-amber-950/15 border-amber-500/30 text-amber-400 hover:bg-amber-950/30'
+              }`}
+            >
+              <span className="text-gold-gradient whitespace-nowrap">Săn hải sản</span>
+            </Link>
             
             {/* Notification Bell (Visible on all devices) */}
             <div className="relative">
@@ -628,15 +641,11 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-blue-900/30 bg-slate-950/95 backdrop-blur-xl absolute w-full left-0 right-0 shadow-[0_15px_30px_rgba(8,18,45,0.8)] transition-all duration-300 animate-in slide-in-from-top-5 duration-300 z-50">
           <div className="px-4 py-6 space-y-2">
-            {navLinks.map((link) => {
+            {navLinks.filter(link => link.href !== '/feedback').map((link) => {
               const isLinkActive = isActive(link.href)
               
               let customMobileClasses = ''
-              if (link.href === '/feedback') {
-                customMobileClasses = isLinkActive
-                  ? 'bg-amber-950/60 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
-                  : 'bg-amber-950/20 border-amber-500/30 hover:bg-amber-950/30'
-              } else if (link.href === '/products') {
+              if (link.href === '/products') {
                 customMobileClasses = isLinkActive
                   ? 'bg-cyan-950/60 border-cyan-500/60 shadow-[0_0_15px_rgba(6,182,212,0.25)]'
                   : 'bg-cyan-950/20 border-cyan-500/30 hover:bg-cyan-950/30'
@@ -655,10 +664,8 @@ export default function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border ${customMobileClasses}`}
                 >
-                  {link.href === '/feedback' ? (
-                    <span className="text-gold-gradient flex items-center gap-1.5">✨ {link.name}</span>
-                  ) : link.href === '/products' ? (
-                    <span className="text-cyan-gradient flex items-center gap-1.5">🐟 {link.name}</span>
+                  {link.href === '/products' ? (
+                    <span className="text-cyan-gradient">{link.name}</span>
                   ) : (
                     link.name
                   )}
