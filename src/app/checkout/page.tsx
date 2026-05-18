@@ -205,16 +205,29 @@ function CheckoutForm() {
         </div>
 
         {/* Auth Tip Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 mb-6 flex items-start gap-2">
-          <span className="text-lg">💡</span>
-          <p>
-            Bạn không cần đăng nhập để đặt hàng. Tuy nhiên, hãy{' '}
-            <Link href="/auth" className="text-blue-600 underline font-medium">
-              đăng ký tài khoản
-            </Link>{' '}
-            để theo dõi lịch sử đơn hàng dễ dàng hơn.
-          </p>
-        </div>
+        {session ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 mb-6 flex items-start gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <span className="text-lg">💡</span>
+            <p>
+              Bạn đã đăng nhập. Bạn có thể xem các đơn hàng đã đặt ở trong mục{' '}
+              <Link href="/profile?tab=orders" className="text-blue-600 underline font-semibold hover:text-blue-500 transition-colors">
+                đơn hàng
+              </Link>
+              .
+            </p>
+          </div>
+        ) : (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 mb-6 flex items-start gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <span className="text-lg">💡</span>
+            <p>
+              Bạn không cần đăng nhập để đặt hàng. Tuy nhiên, hãy{' '}
+              <Link href="/auth" className="text-blue-600 underline font-semibold hover:text-blue-500 transition-colors">
+                đăng ký tài khoản
+              </Link>{' '}
+              để theo dõi lịch sử đơn hàng dễ dàng hơn.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
