@@ -142,7 +142,7 @@ export default function HeroSection() {
           className="inline-flex items-center gap-3 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white text-xl font-bold rounded-2xl transition-all shadow-2xl shadow-orange-500/30 hover:shadow-orange-500/50 group"
           style={{ padding: '18px 48px' }}
         >
-          Đặt ngay
+          Mua ngay
           <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
         </Link>
       </div>
