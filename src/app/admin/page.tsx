@@ -78,6 +78,51 @@ const STATUSES = [
   { value: "cancelled", label: "Đã hủy", badge: "bg-red-100 text-red-700" },
 ];
 
+// Helper functions for delivery type and customer name parsing
+const getCleanCustomerName = (order: Order) => {
+  if (order.profiles?.full_name) return order.profiles.full_name;
+  if (order.note) {
+    const nameMatch = order.note.match(/Tên:\s*([^\n\r]+)/i);
+    if (nameMatch && nameMatch[1]) return nameMatch[1].trim();
+  }
+  return 'Khách vãng lai';
+};
+
+const getOrderWeight = (order: Order) => {
+  return order.order_items.reduce((acc, item) => {
+    const u = (item.products?.unit || "").toLowerCase();
+    if (
+      u.includes("kg") ||
+      u.includes("ký") ||
+      u.includes("ky") ||
+      u.includes("kg/")
+    ) {
+      return acc + item.quantity;
+    }
+    return acc;
+  }, 0);
+};
+
+const getDeliveryType = (order: Order) => {
+  const noteLower = (order.note || '').toLowerCase();
+  if (noteLower.includes('tại công ty') || noteLower.includes('tai cong ty')) {
+    return 'company';
+  }
+  if (
+    noteLower.includes('viettel post') || 
+    noteLower.includes('giao nội thành tphcm') || 
+    noteLower.includes('giao noi thanh tphcm') || 
+    noteLower.includes('giao tận nơi') || 
+    noteLower.includes('giao tan noi') || 
+    noteLower.includes('sđt nhận') ||
+    noteLower.includes('đc:') ||
+    noteLower.includes('địa chỉ')
+  ) {
+    return 'ship';
+  }
+  return 'ship';
+};
+
 export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +147,8 @@ export default function AdminPage() {
   const [showCustomerNames, setShowCustomerNames] = useState(true);
   const [prepMinWeight, setPrepMinWeight] = useState<number>(0);
   const [prepKeyword, setPrepKeyword] = useState<string>("");
+  const [prepDeliveryFilter, setPrepDeliveryFilter] = useState<"all" | "company" | "ship">("all");
+  const [isCompactMode, setIsCompactMode] = useState<boolean>(false);
 
   // Global Broadcast states
   const [globalMessage, setGlobalMessage] = useState("");
@@ -411,9 +458,14 @@ export default function AdminPage() {
   }, [filteredOrders]);
 
   const preparationData = useMemo(() => {
-    const pendingOrders = [...filteredOrders].filter(
+    let pendingOrders = [...filteredOrders].filter(
       (o) => o.status === "pending" || o.status === "confirmed",
     );
+
+    // Lọc theo hình thức nhận hàng (tại công ty vs giao tận nơi/ship)
+    if (prepDeliveryFilter !== "all") {
+      pendingOrders = pendingOrders.filter(o => getDeliveryType(o) === prepDeliveryFilter);
+    }
 
     // B1: Gom nhóm đơn theo khách hàng
     type CustomerGroup = {
@@ -557,7 +609,7 @@ export default function AdminPage() {
       includedOrders,
       totalKg: currentTotalKg,
     };
-  }, [filteredOrders, prepLimit, prepProductFilter, prepMinWeight, prepKeyword]);
+  }, [filteredOrders, prepLimit, prepProductFilter, prepMinWeight, prepKeyword, prepDeliveryFilter]);
 
   const handleBulkUpdateStatus = async () => {
     if (selectedOrderIds.size === 0) return;
@@ -1397,28 +1449,82 @@ export default function AdminPage() {
                   placeholder="VD: tại nhà, công ty..."
                 />
               </div>
-              <div className="md:col-span-2 lg:col-span-4 flex items-center pt-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input 
-                    type="checkbox"
-                    checked={showCustomerNames}
-                    onChange={(e) => setShowCustomerNames(e.target.checked)}
-                    className="w-5 h-5 accent-orange-600"
-                  />
-                  <span className="font-semibold text-gray-700">Hiển thị tên khách hàng trên thẻ in</span>
-                </label>
+
+              {/* Hình thức nhận hàng & Chế độ Tinh gọn */}
+              <div className="md:col-span-2 lg:col-span-4 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200/80 items-end">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Hình thức nhận hàng</label>
+                  <div className="flex bg-gray-200/60 p-1 rounded-xl w-full gap-1">
+                    <button
+                      onClick={() => setPrepDeliveryFilter('all')}
+                      className={`flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all active:scale-95 ${prepDeliveryFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                    >
+                      Tất cả
+                    </button>
+                    <button
+                      onClick={() => setPrepDeliveryFilter('company')}
+                      className={`flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all active:scale-95 ${prepDeliveryFilter === 'company' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                    >
+                      Tại công ty 🏢
+                    </button>
+                    <button
+                      onClick={() => setPrepDeliveryFilter('ship')}
+                      className={`flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all active:scale-95 ${prepDeliveryFilter === 'ship' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                    >
+                      Giao tận nơi 🚚
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between md:justify-end gap-6 h-full pb-0.5">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input 
+                      type="checkbox"
+                      checked={showCustomerNames}
+                      onChange={(e) => setShowCustomerNames(e.target.checked)}
+                      className="w-5 h-5 accent-orange-600 rounded"
+                    />
+                    <span className="font-semibold text-xs sm:text-sm text-gray-700">Tên khách trên thẻ in</span>
+                  </label>
+
+                  <button
+                    onClick={() => setIsCompactMode(!isCompactMode)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all active:scale-95 shadow-sm ${
+                      isCompactMode 
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-transparent ring-2 ring-orange-400 ring-offset-1 font-extrabold' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span>{isCompactMode ? '✨ Đang tinh gọn' : '🔎 Xem tinh gọn'}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Tổng hợp khối lượng */}
-            <div>
-              <h3 className="font-bold text-gray-800 border-b border-gray-200 pb-2 mb-4 text-lg">Tổng khối lượng cần chuẩn bị</h3>
+            <div className="bg-gradient-to-br from-orange-50/20 to-amber-50/20 p-5 rounded-2xl border border-gray-200/60 shadow-[0_4px_20px_rgba(0,0,0,0.01)]">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200/80 pb-4 mb-4 gap-3">
+                <div>
+                  <h3 className="font-extrabold text-gray-800 text-lg">Tổng khối lượng cần chuẩn bị</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Tổng hợp từ các đơn hàng nằm trong mẻ hiện tại.</p>
+                </div>
+                {preparationData.totalKg > 0 && (
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md rounded-2xl px-5 py-3 flex flex-col items-end gap-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">Tổng mẻ thực tế</span>
+                    <span className="text-2xl font-black">
+                      {preparationData.totalKg.toFixed(1)} <span className="text-xs font-semibold text-blue-100">kg</span>
+                      {prepLimit > 0 && <span className="text-xs font-normal text-blue-200"> / {prepLimit} kg Max</span>}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {preparationData.aggregatedProducts.length === 0 ? (
                 <p className="text-gray-500 italic">Không có dữ liệu phù hợp với bộ lọc hiện tại.</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {preparationData.aggregatedProducts.map(([name, data]) => (
-                    <div key={name} className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
+                    <div key={name} className="bg-orange-50 border border-orange-200/80 rounded-xl p-4 text-center shadow-[0_2px_8px_rgba(249,115,22,0.03)] hover:scale-[1.02] transition-transform">
                       <p className="text-xs text-orange-800 font-bold uppercase mb-1 line-clamp-1">{name}</p>
                       <p className="text-2xl font-black text-orange-600">{data.totalQty} <span className="text-sm font-semibold">{data.unit}</span></p>
                     </div>
@@ -1436,42 +1542,86 @@ export default function AdminPage() {
                 {preparationData.includedOrders.length === 0 && (
                   <p className="text-gray-500 italic col-span-full">Chưa có đơn hàng nào cần chuẩn bị.</p>
                 )}
-                {preparationData.includedOrders.map((order, index) => (
-                  <div key={order.id} className="flex flex-col sm:flex-row gap-3 bg-white border border-gray-200 print:border-gray-300 rounded-lg p-3 sm:p-4 shadow-sm print:shadow-none break-inside-avoid">
-                    <div className="sm:w-1/2">
-                      <p className="font-mono text-xs font-bold text-gray-400 print:text-gray-500">
-                        #{(index + 1).toString().padStart(2, '0')} - MÃ: {order.id.slice(0,6).toUpperCase()}
-                      </p>
-                      {showCustomerNames && (
-                        <p className="font-bold text-gray-800 mt-1 print:text-black">
-                          {order.profiles?.full_name || 'Khách (Xem ghi chú)'}
+                {preparationData.includedOrders.map((order, index) => {
+                  if (isCompactMode) {
+                    const cleanName = getCleanCustomerName(order);
+                    return (
+                      <div 
+                        key={order.id} 
+                        className="bg-gradient-to-br from-white to-slate-50/50 border border-slate-200/80 rounded-2xl p-5 shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-md transition-all duration-200 break-inside-avoid flex flex-col gap-4 border-l-4 border-l-orange-500 print:border-slate-300 print:shadow-none"
+                      >
+                        {/* Hàng trên: Số thứ tự + Tên khách hàng */}
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center justify-center bg-slate-100 text-slate-700 text-xs font-black rounded-lg w-7 h-7 shrink-0 print:border print:border-slate-300">
+                            {(index + 1).toString().padStart(2, '0')}
+                          </span>
+                          <p className="font-black text-2xl text-blue-900 tracking-tight print:text-black line-clamp-1">
+                            {cleanName}
+                          </p>
+                        </div>
+                        
+                        {/* Hàng dưới: Danh sách sản phẩm dạng thẻ nhỏ siêu dễ đọc */}
+                        <div className="flex flex-col gap-2 border-t border-slate-100/80 pt-3">
+                          {order.order_items.map(item => {
+                            const pName = item.products?.name || 'SP'
+                            if (prepProductFilter !== 'all' && pName !== prepProductFilter) return null
+                            return (
+                              <div 
+                                key={item.id} 
+                                className="flex justify-between items-center bg-white border border-slate-100 rounded-xl px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.01)] print:border-slate-300"
+                              >
+                                <span className="text-lg font-extrabold text-slate-700 print:text-black">
+                                  {pName}
+                                </span>
+                                <span className="text-xl font-black text-orange-600 print:text-black bg-orange-50/50 px-2.5 py-0.5 rounded-lg border border-orange-100/60 shrink-0">
+                                  {item.quantity} {item.products?.unit}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div key={order.id} className="flex flex-col sm:flex-row gap-3 bg-white border border-gray-200 print:border-gray-300 rounded-lg p-3 sm:p-4 shadow-sm print:shadow-none break-inside-avoid">
+                      <div className="sm:w-1/2">
+                        <p className="font-mono text-xs font-bold text-gray-400 print:text-gray-500">
+                          #{(index + 1).toString().padStart(2, '0')} - MÃ: {order.id.slice(0,6).toUpperCase()}
+                          {prepDeliveryFilter === 'all' && ` · ${getDeliveryType(order) === 'company' ? '🏢 Tại công ty' : '🚚 Giao tận nơi'}`}
                         </p>
-                      )}
-                      <p className="text-[11px] text-gray-500 mt-0.5 print:text-gray-600">
-                        {new Date(order.created_at).toLocaleString('vi-VN')}
-                      </p>
-                      {order.note && showCustomerNames && (
-                        <p className="text-xs text-gray-700 mt-1 italic break-words whitespace-normal print:text-black">
-                          Ghi chú: {order.note}
+                        {showCustomerNames && (
+                          <p className="font-bold text-gray-800 mt-1 print:text-black">
+                            {order.profiles?.full_name || 'Khách (Xem ghi chú)'}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-gray-500 mt-0.5 print:text-gray-600">
+                          {new Date(order.created_at).toLocaleString('vi-VN')}
                         </p>
-                      )}
+                        {order.note && showCustomerNames && (
+                          <p className="text-xs text-gray-700 mt-1 italic break-words whitespace-normal print:text-black">
+                            Ghi chú: {order.note}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1 border-t sm:border-t-0 sm:border-l border-gray-100 print:border-gray-200 pt-2 sm:pt-0 sm:pl-3">
+                        <ul className="text-sm space-y-1">
+                          {order.order_items.map(item => {
+                            const pName = item.products?.name || 'SP'
+                            if (prepProductFilter !== 'all' && pName !== prepProductFilter) return null
+                            return (
+                              <li key={item.id} className="flex justify-between border-b border-gray-100 print:border-gray-200 last:border-0 pb-1">
+                                <span className="text-gray-700 print:text-black text-xs font-medium">{pName}</span>
+                                <span className="font-bold text-gray-900 print:text-black text-xs">{item.quantity} {item.products?.unit}</span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </div>
                     </div>
-                    <div className="flex-1 border-t sm:border-t-0 sm:border-l border-gray-100 print:border-gray-200 pt-2 sm:pt-0 sm:pl-3">
-                      <ul className="text-sm space-y-1">
-                        {order.order_items.map(item => {
-                          const pName = item.products?.name || 'SP'
-                          if (prepProductFilter !== 'all' && pName !== prepProductFilter) return null
-                          return (
-                            <li key={item.id} className="flex justify-between border-b border-gray-100 print:border-gray-200 last:border-0 pb-1">
-                              <span className="text-gray-700 print:text-black text-xs font-medium">{pName}</span>
-                              <span className="font-bold text-gray-900 print:text-black text-xs">{item.quantity} {item.products?.unit}</span>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </div>

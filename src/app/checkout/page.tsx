@@ -88,6 +88,25 @@ function CheckoutForm() {
           })
       }
     })
+
+    // Đăng ký listener lắng nghe sự thay đổi của auth state để cập nhật tức thì
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession)
+      if (currentSession?.user?.id) {
+        supabase.from('profiles').select('full_name, phone').eq('id', currentSession.user.id).single()
+          .then(({ data }) => {
+            if (data?.full_name) setName(data.full_name)
+            if (data?.phone) {
+              setPhone(data.phone)
+              setReceiverPhone(data.phone)
+            }
+          })
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Safeguard: Force delivery method to 'company' if totalKg is less than 5
@@ -208,9 +227,9 @@ function CheckoutForm() {
         {session ? (
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 mb-6 flex items-start gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
             <span className="text-lg">💡</span>
-            <p>
+            <p className="font-medium text-blue-800">
               Bạn đã đăng nhập. Bạn có thể xem các đơn hàng đã đặt ở trong mục{' '}
-              <Link href="/profile?tab=orders" className="text-blue-600 underline font-semibold hover:text-blue-500 transition-colors">
+              <Link href="/profile?tab=orders" className="text-blue-600 underline font-bold hover:text-blue-500 transition-colors">
                 đơn hàng
               </Link>
               .
@@ -222,9 +241,9 @@ function CheckoutForm() {
             <p>
               Bạn không cần đăng nhập để đặt hàng. Tuy nhiên, hãy{' '}
               <Link href="/auth" className="text-blue-600 underline font-semibold hover:text-blue-500 transition-colors">
-                đăng ký tài khoản
+                đăng nhập
               </Link>{' '}
-              để theo dõi lịch sử đơn hàng dễ dàng hơn.
+              để dễ quản lý đơn hàng của bạn hơn.
             </p>
           </div>
         )}
