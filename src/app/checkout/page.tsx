@@ -189,7 +189,7 @@ function CheckoutForm() {
           <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shadow-sm">
             <ShoppingCart className="w-7 h-7 text-blue-600" />
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">Thanh toán</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">Thông tin đặt hàng</h1>
           <p className="text-slate-500 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
             Vui lòng điền thông tin bên dưới để chúng tôi có thể giao hải sản tươi ngon nhất đến bạn.
           </p>

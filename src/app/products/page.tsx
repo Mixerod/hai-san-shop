@@ -20,6 +20,8 @@ type Product = {
   in_stock: boolean
   note: string
   category?: string
+  original_price?: number
+  tag?: string
 }
 
 export default function ProductsPage() {
@@ -113,6 +115,8 @@ export default function ProductsPage() {
   const [session, setSession] = useState<any>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [priceInputs, setPriceInputs] = useState<Record<string, string>>({})
+  const [originalPriceInputs, setOriginalPriceInputs] = useState<Record<string, string>>({})
+  const [tagInputs, setTagInputs] = useState<Record<string, string>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
   const [broadcastId, setBroadcastId] = useState<string | null>(null)
   const [broadcastText, setBroadcastText] = useState('')
@@ -225,18 +229,24 @@ export default function ProductsPage() {
         .order('created_at', { ascending: false })
       setProducts(data || [])
       
-      // Initialize price inputs
-      const inputs: Record<string, string> = {}
+      // Initialize inputs
+      const priceInps: Record<string, string> = {}
+      const origPriceInps: Record<string, string> = {}
+      const tagInps: Record<string, string> = {}
       data?.forEach(p => {
-        inputs[p.id] = String(p.price)
+        priceInps[p.id] = String(p.price)
+        origPriceInps[p.id] = p.original_price ? String(p.original_price) : ''
+        tagInps[p.id] = p.tag || 'none'
       })
-      setPriceInputs(inputs)
+      setPriceInputs(priceInps)
+      setOriginalPriceInputs(origPriceInps)
+      setTagInputs(tagInps)
       setLoading(false)
     }
     load()
   }, [])
 
-  // Price change handler
+  // Save price, original_price and tag to Supabase
   async function handleSavePrice(productId: string, originalProduct: Product) {
     const rawVal = priceInputs[productId]
     const newPrice = parseFloat(rawVal)
@@ -245,40 +255,58 @@ export default function ProductsPage() {
       return
     }
 
-    if (newPrice === originalProduct.price) {
-      showAdminToast('Không có thay đổi về giá.')
-      return
-    }
+    const rawOrigVal = originalPriceInputs[productId]
+    const newOriginalPrice = rawOrigVal ? parseFloat(rawOrigVal) : null
+
+    const newTag = tagInputs[productId] !== undefined ? tagInputs[productId] : (originalProduct.tag || 'none')
 
     setSavingId(productId)
     try {
       const { data, error } = await supabase
         .from('products')
-        .update({ price: newPrice })
+        .update({ 
+          price: newPrice,
+          original_price: newOriginalPrice,
+          tag: newTag
+        })
         .eq('id', productId)
         .select()
 
-      if (error) throw error
+      if (error) {
+        if (error.message.includes('column') && (error.message.includes('original_price') || error.message.includes('tag'))) {
+          alert('💡 Chào Quyết! Để sử dụng tính năng giá Shopee và tag lấp lánh nổi bật, bạn cần thêm hai cột "original_price" và "tag" vào bảng "products" trong database.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy đoạn lệnh sau:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS original_price numeric DEFAULT NULL;\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS tag text DEFAULT \'none\';')
+          return
+        }
+        throw error
+      }
 
       if (!data || data.length === 0) {
         alert('💡 Chào Quyết! Cập nhật không thành công do chính sách bảo mật (RLS) trên Supabase của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền cập nhật sản phẩm:\n\nCREATE POLICY "Allow admin update products" ON public.products FOR UPDATE USING (true) WITH CHECK (true);')
         return
       }
 
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, price: newPrice } : p))
-      showAdminToast('Đã lưu giá mới!')
+      // Update local state
+      setProducts(prev => prev.map(p => p.id === productId ? { 
+        ...p, 
+        price: newPrice, 
+        original_price: newOriginalPrice ?? undefined, 
+        tag: newTag 
+      } : p))
+      showAdminToast('Đã lưu các thay đổi của sản phẩm! 🛡️')
 
       // Ask if admin wants to send a broadcast notification
-      const oldPriceStr = originalProduct.price.toLocaleString('vi-VN')
-      const newPriceStr = newPrice.toLocaleString('vi-VN')
-      const autoMsg = newPrice < originalProduct.price
-        ? `📢 Tin vui cả nhà ơi! Hải sản ${originalProduct.name} vừa GIẢM GIÁ từ ${oldPriceStr}đ xuống chỉ còn ${newPriceStr}đ/${originalProduct.unit}! Ghé shop chốt đơn ngay nà! 🐟`
-        : `📢 Thông báo: Hải sản ${originalProduct.name} vừa cập nhật giá mới từ ${oldPriceStr}đ thành ${newPriceStr}đ/${originalProduct.unit} do biến động nguồn hàng biển Phan Thiết. Cảm ơn cả nhà đã luôn ủng hộ shop! 🐟`
-      setBroadcastText(autoMsg)
-      setBroadcastId(productId)
+      if (newPrice !== originalProduct.price) {
+        const oldPriceStr = originalProduct.price.toLocaleString('vi-VN')
+        const newPriceStr = newPrice.toLocaleString('vi-VN')
+        const autoMsg = newPrice < originalProduct.price
+          ? `📢 Tin vui cả nhà ơi! Hải sản ${originalProduct.name} vừa GIẢM GIÁ từ ${oldPriceStr}đ xuống chỉ còn ${newPriceStr}đ/${originalProduct.unit}! Ghé shop chốt đơn ngay nà! 🐟`
+          : `📢 Thông báo: Hải sản ${originalProduct.name} vừa cập nhật giá mới từ ${oldPriceStr}đ thành ${newPriceStr}đ/${originalProduct.unit} do biến động nguồn hàng biển Phan Thiết. Cảm ơn cả nhà đã luôn ủng hộ shop! 🐟`
+        setBroadcastText(autoMsg)
+        setBroadcastId(productId)
+      }
     } catch (err: any) {
       console.error(err)
-      alert('Lỗi cập nhật giá: ' + err.message)
+      alert('Lỗi cập nhật sản phẩm: ' + err.message)
     } finally {
       setSavingId(null)
     }
@@ -338,6 +366,48 @@ export default function ProductsPage() {
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/15 to-slate-100/50 flex flex-col items-center px-4 py-16">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes border-flame {
+          0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 8px rgba(239, 68, 68, 0.15); }
+          50% { border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 20px rgba(249, 115, 22, 0.65), inset 0 0 8px rgba(249, 115, 22, 0.25); }
+          100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 8px rgba(239, 68, 68, 0.15); }
+        }
+        @keyframes border-cosmic {
+          0% { border-color: rgba(168, 85, 247, 0.4); box-shadow: 0 0 8px rgba(168, 85, 247, 0.15); }
+          50% { border-color: rgba(236, 72, 153, 0.95); box-shadow: 0 0 20px rgba(236, 72, 153, 0.65), inset 0 0 8px rgba(236, 72, 153, 0.25); }
+          100% { border-color: rgba(168, 85, 247, 0.4); box-shadow: 0 0 8px rgba(168, 85, 247, 0.15); }
+        }
+        @keyframes border-neon {
+          0% { border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 0 8px rgba(16, 185, 129, 0.15); }
+          50% { border-color: rgba(6, 182, 212, 0.95); box-shadow: 0 0 20px rgba(6, 182, 212, 0.65), inset 0 0 8px rgba(6, 182, 212, 0.25); }
+          100% { border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 0 8px rgba(16, 185, 129, 0.15); }
+        }
+        @keyframes border-royal {
+          0% { border-color: rgba(234, 179, 8, 0.4); box-shadow: 0 0 8px rgba(234, 179, 8, 0.15); }
+          50% { border-color: rgba(245, 158, 11, 0.98); box-shadow: 0 0 22px rgba(245, 158, 11, 0.7), inset 0 0 10px rgba(245, 158, 11, 0.3); }
+          100% { border-color: rgba(234, 179, 8, 0.4); box-shadow: 0 0 8px rgba(234, 179, 8, 0.15); }
+        }
+        .tag-best-seller {
+          animation: border-flame 3s infinite ease-in-out;
+          border-width: 2px !important;
+          border-style: solid !important;
+        }
+        .tag-rare {
+          animation: border-cosmic 3.5s infinite ease-in-out;
+          border-width: 2px !important;
+          border-style: solid !important;
+        }
+        .tag-new {
+          animation: border-neon 2.5s infinite ease-in-out;
+          border-width: 2px !important;
+          border-style: solid !important;
+        }
+        .tag-premium {
+          animation: border-royal 3s infinite ease-in-out;
+          border-width: 2px !important;
+          border-style: solid !important;
+        }
+      ` }} />
     <main className="w-full max-w-6xl font-sans">
 
       {/* Header */}
@@ -637,13 +707,40 @@ export default function ProductsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-6 md:gap-8">
-          {filteredProducts.map((p) => (
+          {filteredProducts.map((p) => {
+            const tagClass = p.tag === 'best_seller' ? 'tag-best-seller' :
+                             p.tag === 'rare' ? 'tag-rare' :
+                             p.tag === 'new' ? 'tag-new' :
+                             p.tag === 'premium' ? 'tag-premium' : '';
+            return (
               <div 
                 key={p.id} 
-                className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-2 hover:border-blue-500/10 transition-all duration-500 flex flex-col group relative"
+                className={`bg-white border border-slate-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-2 hover:border-blue-500/10 transition-all duration-500 flex flex-col group relative ${tagClass}`}
               >
                 {/* Image Container with Zoom effect */}
                 <div className="overflow-hidden w-full h-36 sm:h-56 bg-slate-50 relative border-b border-slate-100/50">
+                  {/* Glowing tag badges */}
+                  {p.tag === 'best_seller' && (
+                    <div className="absolute top-2.5 left-2.5 z-30 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white font-black text-[9px] sm:text-[10px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md shadow-orange-500/20 border border-orange-400/20 uppercase tracking-wider animate-pulse">
+                      <span>🔥</span> Bán chạy
+                    </div>
+                  )}
+                  {p.tag === 'rare' && (
+                    <div className="absolute top-2.5 left-2.5 z-30 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-pink-500 text-white font-black text-[9px] sm:text-[10px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md shadow-purple-500/20 border border-purple-400/20 uppercase tracking-wider">
+                      <span>💎</span> Hải sản hiếm
+                    </div>
+                  )}
+                  {p.tag === 'new' && (
+                    <div className="absolute top-2.5 left-2.5 z-30 bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-black text-[9px] sm:text-[10px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md shadow-emerald-500/20 border border-emerald-400/20 uppercase tracking-wider">
+                      <span>⚡</span> Hàng mới
+                    </div>
+                  )}
+                  {p.tag === 'premium' && (
+                    <div className="absolute top-2.5 left-2.5 z-30 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-white font-black text-[9px] sm:text-[10px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md shadow-yellow-500/25 border border-yellow-300/35 uppercase tracking-wider">
+                      <span>👑</span> Ngon đặc biệt
+                    </div>
+                  )}
+
                   {p.image_url ? (
                     <img 
                       src={p.image_url} 
@@ -732,9 +829,22 @@ export default function ProductsPage() {
                             <span className="text-[10px] sm:text-xs font-semibold text-slate-400">/{p.unit}</span>
                           </div>
                         ) : (
-                          <p className="text-blue-600 font-black text-[13px] sm:text-2xl tracking-tight">
-                            {p.price.toLocaleString('vi-VN')}đ<span className="text-[9px] sm:text-sm font-medium text-slate-400">/{p.unit}</span>
-                          </p>
+                          <div className="flex flex-col gap-0.5">
+                            {p.original_price && p.original_price > p.price ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] sm:text-xs text-slate-400 line-through font-semibold">
+                                  {p.original_price.toLocaleString('vi-VN')}đ
+                                </span>
+                                <span className="bg-red-500/10 text-red-500 text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-md border border-red-500/10 animate-pulse">
+                                  -{Math.round(((p.original_price - p.price) / p.original_price) * 100)}%
+                                </span>
+                              </div>
+                            ) : null}
+                            <p className="text-blue-600 font-black text-[13px] sm:text-2xl tracking-tight">
+                              {p.price.toLocaleString('vi-VN')}đ
+                              <span className="text-[9px] sm:text-sm font-medium text-slate-400">/{p.unit}</span>
+                            </p>
+                          </div>
                         )}
                       </div>
                       
@@ -785,22 +895,62 @@ export default function ProductsPage() {
                       </div>
                     )}
 
-                    {/* Admin Category Inline Selector */}
+                    {/* Admin Category, Original Price & Highlight Tags Inline Selectors */}
                     {isAdmin && (
-                      <div className="mt-2.5 mb-4 pt-2.5 border-t border-slate-100 flex flex-col gap-1 w-full text-left">
-                        <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider">Phân loại danh mục</span>
-                        <select
-                          value={p.category || getFallbackCategory(p)}
-                          onChange={async (e) => {
-                            const newCat = e.target.value
-                            await handleSaveCategory(p.id, newCat)
-                          }}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] text-slate-700 font-extrabold outline-none focus:border-blue-500 cursor-pointer shadow-inner"
-                        >
-                          {categories.filter(c => c !== 'Tất cả').map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
+                      <div className="mt-2.5 mb-4 pt-2.5 border-t border-slate-100 flex flex-col gap-2.5 w-full text-left">
+                        {/* Category Inline Selector */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider">Phân loại danh mục</span>
+                          <select
+                            value={p.category || getFallbackCategory(p)}
+                            onChange={async (e) => {
+                              const newCat = e.target.value
+                              await handleSaveCategory(p.id, newCat)
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] text-slate-705 font-extrabold outline-none focus:border-blue-500 cursor-pointer shadow-inner"
+                          >
+                            {categories.filter(c => c !== 'Tất cả').map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Original Price Inline Input */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider">Giá gốc (gốc lúc chưa giảm)</span>
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              value={originalPriceInputs[p.id] !== undefined ? originalPriceInputs[p.id] : (p.original_price || '')}
+                              placeholder="Trống (Không giảm giá)"
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setOriginalPriceInputs(prev => ({ ...prev, [p.id]: val }))
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] text-slate-705 font-extrabold outline-none focus:border-blue-500 shadow-inner pr-6"
+                            />
+                            <span className="absolute right-2.5 text-slate-400 text-[10px] font-bold pointer-events-none">đ</span>
+                          </div>
+                        </div>
+
+                        {/* Highlight Tag Selector */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider">Thẻ nổi bật & Viền lấp lánh</span>
+                          <select
+                            value={tagInputs[p.id] !== undefined ? tagInputs[p.id] : (p.tag || 'none')}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setTagInputs(prev => ({ ...prev, [p.id]: val }))
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] text-slate-705 font-extrabold outline-none focus:border-blue-500 cursor-pointer shadow-inner"
+                          >
+                            <option value="none">Không có (Bình thường)</option>
+                            <option value="best_seller">🔥 Bán chạy</option>
+                            <option value="rare">💎 Hải sản hiếm</option>
+                            <option value="new">⚡ Hàng mới</option>
+                            <option value="premium">👑 Ngon đặc biệt</option>
+                          </select>
+                        </div>
                       </div>
                     )}
 
@@ -893,7 +1043,8 @@ export default function ProductsPage() {
                   </div>
                 </div>
               </div>
-            ))}
+            )
+          })}
         </div>
       )}
 

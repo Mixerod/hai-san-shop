@@ -20,7 +20,8 @@ import {
   Calendar,
   CreditCard,
   MessageCircle,
-  Check
+  Check,
+  Info
 } from 'lucide-react'
 
 // Types
@@ -136,9 +137,16 @@ function ProfileContent() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileMsg, setProfileMsg] = useState({ type: '', text: '' })
 
+  // Security states
+  const [linkEmail, setLinkEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [savingSecurity, setSavingSecurity] = useState(false)
+  const [securityMsg, setSecurityMsg] = useState({ type: '', text: '' })
+
   // Orders states
   const [orders, setOrders] = useState<Order[]>([])
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({})
+  const [showPaymentInfo, setShowPaymentInfo] = useState<string | null>(null)
 
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
@@ -239,6 +247,50 @@ function ProfileContent() {
     }
   }
 
+  async function handleLinkEmail() {
+    if (!linkEmail) return
+    setSavingSecurity(true)
+    setSecurityMsg({ type: '', text: '' })
+    try {
+      const { error } = await supabase.auth.updateUser({ email: linkEmail })
+      if (error) throw error
+
+      // Tương thích ngược: Trích xuất username cũ nếu họ đang dùng email ảo để tự động điền vào bảng profiles
+      const currentAuthEmail = session?.user?.email || ''
+      const updatePayload: any = { email: linkEmail }
+      if (currentAuthEmail.includes('@user.haisanshop.com')) {
+        updatePayload.username = currentAuthEmail.split('@')[0]
+      }
+
+      // Lưu lại email thật (và username nếu có) vào bảng profiles để frontend có thể tra cứu chéo khi đăng nhập
+      const { error: profileError } = await supabase.from('profiles').update(updatePayload).eq('id', session.user.id)
+      if (profileError) throw profileError
+
+      setSecurityMsg({ type: 'success', text: 'Đã gửi yêu cầu xác nhận đến Email mới. Vui lòng kiểm tra hộp thư.' })
+      setLinkEmail('')
+    } catch (error: any) {
+      setSecurityMsg({ type: 'error', text: error.message || 'Không thể cập nhật Email.' })
+    } finally {
+      setSavingSecurity(false)
+    }
+  }
+
+  async function handleChangePassword() {
+    if (!newPassword || newPassword.length < 6) return
+    setSavingSecurity(true)
+    setSecurityMsg({ type: '', text: '' })
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      setSecurityMsg({ type: 'success', text: 'Đổi mật khẩu thành công!' })
+      setNewPassword('')
+    } catch (error: any) {
+      setSecurityMsg({ type: 'error', text: error.message || 'Không thể đổi mật khẩu.' })
+    } finally {
+      setSavingSecurity(false)
+    }
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push('/')
@@ -304,7 +356,11 @@ function ProfileContent() {
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 leading-tight">
                 {profile.full_name || 'Khách hàng'}
               </h1>
-              <p className="text-slate-500 text-xs sm:text-sm font-semibold mt-1 tracking-wide">{session?.user?.email}</p>
+              <p className="text-slate-500 text-xs sm:text-sm font-semibold mt-1 tracking-wide">
+                {session?.user?.email?.includes('@user.haisanshop.com') 
+                  ? <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/50">Chưa liên kết Email</span> 
+                  : session?.user?.email}
+              </p>
             </div>
           </div>
           <button 
@@ -412,6 +468,80 @@ function ProfileContent() {
                 </button>
               </div>
             </form>
+
+            {/* Account Security Section */}
+            <hr className="my-10 border-slate-100" />
+
+            <div className="flex flex-col items-center text-center mb-8">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center justify-center gap-3">
+                Bảo mật tài khoản
+              </h2>
+              <div className="w-10 h-1 bg-red-500 rounded-full mt-3 animate-pulse"></div>
+            </div>
+
+            {securityMsg.text && (
+              <div className={`mb-8 flex items-start gap-3 p-4 rounded-xl text-sm font-medium border animate-in fade-in duration-300 ${
+                securityMsg.type === 'success' 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                {securityMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
+                <p>{securityMsg.text}</p>
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {/* Liên kết Email */}
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
+                <h3 className="text-sm font-bold text-slate-800 mb-2">Liên kết Email khôi phục</h3>
+                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                  Nếu bạn đang đăng nhập bằng Tên đăng nhập, hãy liên kết với một Email thật để khôi phục mật khẩu khi lỡ quên. 
+                  <br/>
+                  <strong className="text-emerald-600">Đặc quyền: Sau khi liên kết, bạn có thể dùng CẢ Tên đăng nhập gốc hoặc Email mới này để đăng nhập!</strong>
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="email"
+                    value={linkEmail}
+                    onChange={(e) => setLinkEmail(e.target.value)}
+                    className="flex-1 bg-white border border-slate-200/80 rounded-xl px-4 py-3 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition-all text-sm"
+                    placeholder={session?.user?.email?.includes('@user.haisanshop.com') ? "Nhập Email thật của bạn..." : session?.user?.email}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLinkEmail}
+                    disabled={savingSecurity || !linkEmail}
+                    className="shrink-0 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition-all text-sm"
+                  >
+                    Cập nhật Email
+                  </button>
+                </div>
+              </div>
+
+              {/* Đổi mật khẩu */}
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
+                <h3 className="text-sm font-bold text-slate-800 mb-2">Đổi mật khẩu mới</h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    minLength={6}
+                    className="flex-1 bg-white border border-slate-200/80 rounded-xl px-4 py-3 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition-all text-sm"
+                    placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleChangePassword}
+                    disabled={savingSecurity || !newPassword || newPassword.length < 6}
+                    className="shrink-0 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition-all text-sm"
+                  >
+                    Đổi mật khẩu
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -509,8 +639,20 @@ function ProfileContent() {
                       {/* Timeline / Stepper */}
                       <OrderStepper status={order.status} />
 
-                      {order.status === 'delivering' && (
-                        <div className="px-5 sm:px-10 pb-8 flex justify-center">
+                      <div className="px-5 sm:px-10 pb-4 flex flex-wrap gap-4 justify-center">
+                        {['pending', 'confirmed', 'delivering'].includes(order.status) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowPaymentInfo(showPaymentInfo === order.id ? null : order.id);
+                            }}
+                            className="bg-orange-500 hover:bg-orange-400 text-white font-extrabold py-3.5 px-8 rounded-xl shadow-lg shadow-orange-500/15 hover:shadow-xl hover:shadow-orange-500/25 active:scale-95 transition-all flex items-center gap-2 border border-orange-600/20"
+                          >
+                            <CreditCard className="w-5 h-5" />
+                            Thanh toán
+                          </button>
+                        )}
+                        {order.status === 'delivering' && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -521,6 +663,24 @@ function ProfileContent() {
                             <CheckCircle2 className="w-5 h-5" />
                             Xác nhận đã nhận hàng
                           </button>
+                        )}
+                      </div>
+
+                      {/* Payment Info Dropdown */}
+                      {showPaymentInfo === order.id && (
+                        <div className="px-5 sm:px-10 pb-8 animate-in slide-in-from-top-2">
+                          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-sm text-orange-900 shadow-inner">
+                            <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
+                              <Info className="w-4 h-4" />
+                              Thông tin thanh toán
+                            </h4>
+                            <ul className="space-y-2 font-medium">
+                              <li>• <strong className="text-orange-700">Tiền mặt:</strong> Thanh toán trực tiếp cho shipper khi nhận hàng.</li>
+                              <li>• <strong className="text-orange-700">Chuyển khoản:</strong> Ngân hàng Vietcombank - STK <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-orange-200">123456789</span></li>
+                              <li>• <strong className="text-orange-700">Chủ tài khoản:</strong> NGUYEN VAN A</li>
+                              <li>• <strong className="text-orange-700">Nội dung CK:</strong> <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-orange-200 text-blue-700">DH {order.id.slice(0, 8).toUpperCase()}</span></li>
+                            </ul>
+                          </div>
                         </div>
                       )}
 

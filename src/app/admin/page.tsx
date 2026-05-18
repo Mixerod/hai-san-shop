@@ -21,6 +21,12 @@ import {
   Send,
   ChevronDown,
   ChevronUp,
+  PlusCircle,
+  UploadCloud,
+  Image as ImageIcon,
+  MessageSquare,
+  Star,
+  Fish
 } from "lucide-react";
 
 type OrderItem = {
@@ -85,7 +91,12 @@ export default function AdminPage() {
   const [updatingBulk, setUpdatingBulk] = useState(false);
 
   // Preparation stats states
-  const [activeTab, setActiveTab] = useState<"orders" | "preparation">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "preparation" | "products" | "feedbacks">("orders");
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [selectedChatUser, setSelectedChatUser] = useState<string | null>(null);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
   const [prepLimit, setPrepLimit] = useState<number>(20);
   const [prepProductFilter, setPrepProductFilter] = useState<string>("all");
   const [showCustomerNames, setShowCustomerNames] = useState(true);
@@ -139,6 +150,98 @@ export default function AdminPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // -------------------------------------------------------------
+  // Add Product states & logic
+  // -------------------------------------------------------------
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    description: '',
+    price: 0,
+    unit: 'kg',
+    image_url: '',
+    total_sold: 0,
+    in_stock: true,
+    note: '',
+    category: 'haisan',
+    original_price: null as number | null,
+    tag: 'none'
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [addingProduct, setAddingProduct] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      // Loại bỏ dấu câu và khoảng trắng khỏi tên file, thêm timestamp để không bị trùng
+      const safeName = file.name.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+      const fileName = `${Date.now()}_${safeName}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('haisanshop')
+        .upload(fileName, file);
+
+      if (error) {
+        if (error.message.includes('Bucket not found')) {
+          throw new Error('Chưa tạo bucket "haisanshop" trên Supabase Storage. Hãy vào Storage tạo bucket "haisanshop" ở chế độ Public.');
+        }
+        throw error;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('haisanshop')
+        .getPublicUrl(fileName);
+
+      setNewProduct(prev => ({ ...prev, image_url: publicUrlData.publicUrl }));
+      showToast('Đã tải ảnh lên thành công!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Lỗi tải ảnh: ' + err.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProduct.name || newProduct.price <= 0) {
+      alert("Vui lòng nhập tên và giá sản phẩm hợp lệ!");
+      return;
+    }
+
+    setAddingProduct(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .insert([newProduct]);
+
+      if (error) throw error;
+
+      showToast('Đã thêm sản phẩm thành công!');
+      setNewProduct({
+        name: '',
+        description: '',
+        price: 0,
+        unit: 'kg',
+        image_url: '',
+        total_sold: 0,
+        in_stock: true,
+        note: '',
+        category: 'haisan',
+        original_price: null,
+        tag: 'none'
+      });
+    } catch (err: any) {
+      console.error(err);
+      alert('Lỗi thêm sản phẩm: ' + err.message);
+    } finally {
+      setAddingProduct(false);
+    }
+  };
+
   const copyZaloMessage = (order: Order) => {
     const name = order.profiles?.full_name || "bạn";
     const shortId = order.id.slice(0, 8).toUpperCase();
@@ -156,7 +259,66 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchOrders();
+    fetchFeedbacks();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'feedbacks') {
+      fetchFeedbacks();
+      const interval = setInterval(fetchFeedbacks, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab]);
+
+  async function fetchFeedbacks() {
+    try {
+      const { data, error } = await supabase
+        .from("feedbacks")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      if (data) setFeedbacks(data);
+    } catch (err) {
+      console.error("Lỗi fetch feedbacks:", err);
+    }
+  }
+
+  async function handleSendReply(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedChatUser || !replyMessage.trim()) return;
+
+    setSendingReply(true);
+    try {
+      const { error } = await supabase
+        .from('feedbacks')
+        .insert({
+          title: `[Reply] ${selectedChatUser}`,
+          content: replyMessage.trim(),
+          rating: 5
+        });
+
+      if (error) throw error;
+      setReplyMessage("");
+      fetchFeedbacks();
+    } catch (err: any) {
+      alert("Lỗi khi gửi phản hồi: " + err.message);
+    } finally {
+      setSendingReply(false);
+    }
+  }
+
+  async function handleDeleteFeedback(id: string) {
+    if (!confirm("Bạn có chắc chắn muốn xóa phản hồi/yêu cầu này không?")) return;
+    try {
+      const { error } = await supabase.from('feedbacks').delete().eq('id', id);
+      if (error) throw error;
+      showToast("Đã xóa thành công!");
+      fetchFeedbacks();
+    } catch (err: any) {
+      alert("Lỗi khi xóa: " + err.message);
+    }
+  }
 
   async function fetchOrders() {
     setLoading(true);
@@ -720,6 +882,25 @@ export default function AdminPage() {
             Gom đơn & Thống kê làm hàng
             <span className="bg-orange-100 text-orange-600 py-0.5 px-2 rounded-full text-[10px]">Mới</span>
           </button>
+          <button 
+            onClick={() => setActiveTab('products')}
+            className={`pb-4 px-2 font-bold text-sm transition-all border-b-4 flex items-center gap-2 ${activeTab === 'products' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            <PlusCircle className="w-4 h-4" />
+            Thêm sản phẩm
+          </button>
+          <button 
+            onClick={() => setActiveTab('feedbacks')}
+            className={`pb-4 px-2 font-bold text-sm transition-all border-b-4 flex items-center gap-2 ${activeTab === 'feedbacks' ? 'border-pink-600 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            Góp ý & Đặt trước
+            {feedbacks.length > 0 && (
+              <span className="bg-pink-100 text-pink-600 py-0.5 px-2 rounded-full text-[10px]">
+                {feedbacks.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {activeTab === 'orders' && (
@@ -1274,6 +1455,389 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'products' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 animate-in fade-in duration-300">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <PlusCircle className="w-6 h-6 text-green-600" />
+                Thêm Sản Phẩm Mới
+              </h2>
+              <p className="text-gray-500 mt-1">
+                Điền thông tin và tải ảnh lên để thêm sản phẩm trực tiếp vào cửa hàng.
+              </p>
+            </div>
+
+            <form onSubmit={handleAddProduct} className="space-y-6 max-w-4xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Ảnh Sản Phẩm */}
+                <div className="md:col-span-2 flex flex-col items-start gap-4">
+                  <label className="block text-sm font-semibold text-gray-700">Ảnh Sản Phẩm</label>
+                  <div className="flex items-center gap-6 w-full">
+                    <div className="w-32 h-32 shrink-0 bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden flex items-center justify-center relative">
+                      {newProduct.image_url ? (
+                        <img src={newProduct.image_url} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-gray-400" />
+                      )}
+                      {uploadingImage && (
+                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <label className="flex items-center justify-center w-full sm:w-auto sm:inline-flex px-6 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 cursor-pointer focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                        <UploadCloud className="w-5 h-5 mr-2 text-gray-500" />
+                        <span>Tải ảnh lên (Supabase)</span>
+                        <input type="file" className="sr-only" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} />
+                      </label>
+                      <p className="mt-2 text-xs text-gray-500">Hỗ trợ JPG, PNG, WEBP. Ảnh sẽ được tự động lưu vào bucket "haisanshop".</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Tên Sản Phẩm *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newProduct.name}
+                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                    placeholder="VD: Chả mực giã tay..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Danh Mục</label>
+                  <input
+                    type="text"
+                    value={newProduct.category || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                    placeholder="VD: haisan, chamuc, kho..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Giá (VNĐ) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={newProduct.price || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none font-bold"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Giá gốc chưa giảm (Shopee-style)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newProduct.original_price || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, original_price: e.target.value ? Number(e.target.value) : null })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none font-bold"
+                    placeholder="Trống (Không giảm giá)"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Thẻ nổi bật & Viền lấp lánh</label>
+                  <select
+                    value={newProduct.tag || 'none'}
+                    onChange={(e) => setNewProduct({ ...newProduct, tag: e.target.value })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none cursor-pointer font-bold"
+                  >
+                    <option value="none">Không có (Bình thường)</option>
+                    <option value="best_seller">🔥 Bán chạy</option>
+                    <option value="rare">💎 Hải sản hiếm</option>
+                    <option value="new">⚡ Hàng mới</option>
+                    <option value="premium">👑 Ngon đặc biệt</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Đơn vị tính</label>
+                  <input
+                    type="text"
+                    value={newProduct.unit}
+                    onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                    placeholder="VD: kg, hộp 500g, con..."
+                  />
+                </div>
+
+                <div className="md:col-span-2 space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Mô Tả Sản Phẩm</label>
+                  <textarea
+                    rows={4}
+                    value={newProduct.description}
+                    onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-3 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none resize-none"
+                    placeholder="Nhập mô tả chi tiết sản phẩm..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">Ghi chú thêm (hiển thị mờ)</label>
+                  <input
+                    type="text"
+                    value={newProduct.note}
+                    onChange={(e) => setNewProduct({ ...newProduct, note: e.target.value })}
+                    className="w-full border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 focus:bg-white border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                    placeholder="VD: Bảo quản ngăn đông..."
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 pt-6">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={newProduct.in_stock}
+                      onChange={(e) => setNewProduct({ ...newProduct, in_stock: e.target.checked })}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                    <span className="ms-3 text-sm font-semibold text-gray-900">Còn hàng</span>
+                  </label>
+                </div>
+                <div className="md:col-span-2 pt-6 border-t border-gray-150 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={addingProduct}
+                    className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 active:scale-95 text-white font-extrabold rounded-2xl shadow-lg shadow-green-650/20 border border-green-600 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm uppercase tracking-wider"
+                  >
+                    {addingProduct ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Đang thêm sản phẩm...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Thêm Sản Phẩm</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+            </form>
+          </div>
+        )}
+
+        {activeTab === 'feedbacks' && (() => {
+          // Parse và gom nhóm
+          const preorders = feedbacks.filter(f => f.title?.startsWith('[Pre-Order] '));
+          const ratingFeedbacks = feedbacks.filter(f => f.title?.startsWith('[Feedback] ') || (!f.title?.startsWith('[Pre-Order] ') && !f.title?.startsWith('[Chat] ') && !f.title?.startsWith('[Reply] ')));
+          
+          // Gom nhóm Chat Sessions
+          const chatSessionsMap: { [key: string]: any[] } = {};
+          feedbacks.forEach(f => {
+            const isChat = f.title?.startsWith('[Chat] ') || f.title?.startsWith('[Reply] ');
+            if (isChat) {
+              const user = f.title.replace('[Chat] ', '').replace('[Reply] ', '');
+              if (!chatSessionsMap[user]) chatSessionsMap[user] = [];
+              chatSessionsMap[user].push(f);
+            }
+          });
+
+          const chatSessions = Object.entries(chatSessionsMap).map(([user, msgs]) => {
+            const sorted = [...msgs].sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            const latest = sorted[sorted.length - 1];
+            return { user, messages: sorted, latestTime: latest.created_at, latestContent: latest.content };
+          }).sort((a,b) => new Date(b.latestTime).getTime() - new Date(a.latestTime).getTime());
+
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 animate-in fade-in duration-300">
+              <div className="mb-8 border-b border-gray-150 pb-4">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <MessageSquare className="w-6 h-6 text-pink-600" />
+                  Trung Tâm Góp Ý & Đặt Trước Hải Sản
+                </h2>
+                <p className="text-gray-500 mt-1">
+                  Đọc phản hồi từ khách hàng, quản lý đơn hàng hải sản hiếm đặt trước, và phản hồi cuộc chat trực tuyến.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                {/* 1. Đặt trước Hải sản Hiếm (4 cột) */}
+                <div className="lg:col-span-4 space-y-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base border-b border-gray-100 pb-2">
+                    <Fish className="w-5 h-5 text-orange-500" />
+                    Đặt Trước Hải Sản Hiếm ({preorders.length})
+                  </h3>
+                  {preorders.length === 0 ? (
+                    <p className="text-gray-400 italic text-sm py-4">Không có yêu cầu đặt trước nào.</p>
+                  ) : (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                      {preorders.map(pre => {
+                        const fishName = pre.title.replace('[Pre-Order] ', '');
+                        return (
+                          <div key={pre.id} className="bg-orange-50/50 border border-orange-100 rounded-xl p-4 relative group">
+                            <button
+                              onClick={() => handleDeleteFeedback(pre.id)}
+                              className="absolute top-3 right-3 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Xóa yêu cầu"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            <h4 className="font-extrabold text-orange-950 text-sm">{fishName}</h4>
+                            <p className="text-xs text-gray-600 mt-2 font-semibold break-words whitespace-normal">{pre.content}</p>
+                            <span className="text-[10px] text-gray-400 font-bold block mt-2">
+                              {new Date(pre.created_at).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Đánh giá & Góp ý (4 cột) */}
+                <div className="lg:col-span-4 space-y-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base border-b border-gray-100 pb-2">
+                    <Star className="w-5 h-5 text-yellow-500" />
+                    Đánh Giá & Góp Ý ({ratingFeedbacks.length})
+                  </h3>
+                  {ratingFeedbacks.length === 0 ? (
+                    <p className="text-gray-400 italic text-sm py-4">Không có góp ý nào.</p>
+                  ) : (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                      {ratingFeedbacks.map(fb => {
+                        const cleanTitle = fb.title?.startsWith('[Feedback] ') ? fb.title.replace('[Feedback] ', '') : (fb.title || 'Góp ý chất lượng');
+                        return (
+                          <div key={fb.id} className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 relative group">
+                            <button
+                              onClick={() => handleDeleteFeedback(fb.id)}
+                              className="absolute top-3 right-3 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Xóa góp ý"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            <div className="flex items-center gap-1 mb-1.5">
+                              {Array.from({ length: fb.rating || 5 }).map((_, i) => (
+                                <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                              ))}
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-sm leading-tight">{cleanTitle}</h4>
+                            <p className="text-xs text-gray-600 mt-1.5 leading-relaxed font-semibold break-words whitespace-normal">{fb.content}</p>
+                            <span className="text-[10px] text-gray-400 font-bold block mt-2">
+                              {new Date(fb.created_at).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Live Chat Hỗ Trợ (4 cột) */}
+                <div className="lg:col-span-4 space-y-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base border-b border-gray-100 pb-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Chat Hỗ Trợ Trực Tuyến
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    {/* Danh sách phòng chat */}
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                      {chatSessions.length === 0 ? (
+                        <p className="text-gray-400 italic text-sm py-4">Chưa có ai bắt đầu chat.</p>
+                      ) : (
+                        chatSessions.map(sess => (
+                          <button
+                            key={sess.user}
+                            onClick={() => {
+                              setSelectedChatUser(sess.user);
+                              setReplyMessage("");
+                            }}
+                            className={`w-full text-left p-3 rounded-xl border transition-all ${
+                              selectedChatUser === sess.user
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
+                                : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100 text-gray-700'
+                            }`}
+                          >
+                            <p className="text-xs font-black truncate">{sess.user}</p>
+                            <p className="text-[10px] text-gray-500 truncate mt-0.5 font-semibold">{sess.latestContent}</p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Hộp thoại Chat đang chọn */}
+                    {selectedChatUser ? (
+                      <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col h-[320px] bg-slate-50">
+                        {/* Header phòng chat */}
+                        <div className="bg-emerald-600 text-white px-3.5 py-2.5 flex justify-between items-center shrink-0">
+                          <span className="text-[11px] font-black truncate max-w-[80%]">{selectedChatUser}</span>
+                          <button 
+                            onClick={() => setSelectedChatUser(null)}
+                            className="text-xs hover:underline font-bold"
+                          >
+                            Đóng
+                          </button>
+                        </div>
+
+                        {/* List tin nhắn */}
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+                          {chatSessions.find(s => s.user === selectedChatUser)?.messages.map(m => {
+                            const isReply = m.title?.startsWith('[Reply]');
+                            return (
+                              <div key={m.id} className={`flex flex-col ${isReply ? 'items-end' : 'items-start'}`}>
+                                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                                  isReply 
+                                    ? 'bg-emerald-600 text-white rounded-tr-none' 
+                                    : 'bg-white border border-slate-250 text-gray-800 rounded-tl-none'
+                                }`}>
+                                  {m.content}
+                                </div>
+                                <span className="text-[8px] text-gray-400 mt-0.5">
+                                  {new Date(m.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Nhập tin nhắn phản hồi */}
+                        <form onSubmit={handleSendReply} className="p-2 bg-white border-t border-slate-200 flex gap-2 shrink-0">
+                          <input
+                            required
+                            type="text"
+                            value={replyMessage}
+                            onChange={(e) => setReplyMessage(e.target.value)}
+                            placeholder="Nhập nội dung phản hồi..."
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500 font-semibold"
+                          />
+                          <button
+                            type="submit"
+                            disabled={sendingReply || !replyMessage.trim()}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold disabled:opacity-50"
+                          >
+                            {sendingReply ? '...' : 'Gửi'}
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <div className="border border-dashed border-gray-300 rounded-xl p-6 text-center text-gray-400 text-xs bg-slate-50/50 flex flex-col items-center justify-center h-[200px]">
+                        💬 Chọn một cuộc trò chuyện ở danh sách phía trên để bắt đầu phản hồi khách hàng.
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
         </div>
       </div>
     </div>

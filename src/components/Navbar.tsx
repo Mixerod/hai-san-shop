@@ -20,6 +20,9 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [readIds, setReadIds] = useState<string[]>([])
+  const [deletedIds, setDeletedIds] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState<'new' | 'read'>('new')
 
   // Cửa Ẩn: Lắng nghe phím tắt Ctrl + Shift + / toàn cục
   useEffect(() => {
@@ -140,17 +143,30 @@ export default function Navbar() {
           .from('notifications')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(40)
         if (!error && data) {
           setNotifications(data)
+          
           const readIdsString = localStorage.getItem('read_notification_ids') || '[]'
-          let readIds: string[] = []
+          let rIds: string[] = []
           try {
-            readIds = JSON.parse(readIdsString)
+            rIds = JSON.parse(readIdsString)
           } catch {
-            readIds = []
+            rIds = []
           }
-          const unread = data.filter(n => !readIds.includes(String(n.id))).length
+          setReadIds(rIds)
+
+          const deletedIdsString = localStorage.getItem('deleted_notification_ids') || '[]'
+          let dIds: string[] = []
+          try {
+            dIds = JSON.parse(deletedIdsString)
+          } catch {
+            dIds = []
+          }
+          setDeletedIds(dIds)
+
+          // Unread notifications: not read and not deleted
+          const unread = data.filter(n => !rIds.includes(String(n.id)) && !dIds.includes(String(n.id))).length
           setUnreadCount(unread)
         }
       } catch (err) {
@@ -166,26 +182,13 @@ export default function Navbar() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
         const newNotification = payload.new
         setNotifications(prev => {
-          const updated = [newNotification, ...prev.slice(0, 4)]
-          if (showNotificationsRef.current) {
-            const readIdsString = localStorage.getItem('read_notification_ids') || '[]'
-            let readIds: string[] = []
-            try {
-              readIds = JSON.parse(readIdsString)
-            } catch {
-              readIds = []
-            }
-            if (!readIds.includes(String(newNotification.id))) {
-              readIds.push(String(newNotification.id))
-              localStorage.setItem('read_notification_ids', JSON.stringify(readIds))
-            }
-          }
+          // Add the new notification, filter out possible duplicate, and keep top 40
+          const updated = [newNotification, ...prev.filter(n => n.id !== newNotification.id).slice(0, 39)]
           return updated
         })
         
-        if (!showNotificationsRef.current) {
-          setUnreadCount(c => c + 1)
-        }
+        // Brand new notification is unread and not deleted
+        setUnreadCount(c => c + 1)
       })
       .subscribe()
 
@@ -195,12 +198,29 @@ export default function Navbar() {
   }, [])
 
   const handleToggleNotifications = () => {
-    const nextState = !showNotifications
-    setShowNotifications(nextState)
-    if (nextState) {
-      setUnreadCount(0)
-      const currentIds = notifications.map(n => String(n.id))
-      localStorage.setItem('read_notification_ids', JSON.stringify(currentIds))
+    setShowNotifications(!showNotifications)
+  }
+
+  const handleMarkAsRead = (id: string) => {
+    const stringId = String(id)
+    if (!readIds.includes(stringId)) {
+      const updatedReadIds = [...readIds, stringId]
+      setReadIds(updatedReadIds)
+      localStorage.setItem('read_notification_ids', JSON.stringify(updatedReadIds))
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    }
+  }
+
+  const handleDeleteNotification = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    const stringId = String(id)
+    if (!deletedIds.includes(stringId)) {
+      const updatedDeletedIds = [...deletedIds, stringId]
+      setDeletedIds(updatedDeletedIds)
+      localStorage.setItem('deleted_notification_ids', JSON.stringify(updatedDeletedIds))
+      if (!readIds.includes(stringId)) {
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
     }
   }
 
@@ -210,8 +230,8 @@ export default function Navbar() {
     { name: 'Trang chủ', href: '/' },
     { name: 'Sản phẩm', href: '/products' },
     { name: 'Đơn hàng', href: '/profile?tab=orders' },
-    { name: 'Góp ý', href: '/feedback' },
-  ]
+    { name: 'Săn hải sản', href: '/feedback' },
+  ];
 
   // Logic tàng hình: Chỉ hiện nút Quản trị nếu đúng Email admin
   const isAdmin = hasHydrated && session?.user?.email === 'minhquyet08122003@gmail.com'
@@ -279,6 +299,52 @@ export default function Navbar() {
           background-size: 200% auto;
           animation: shimmer-auth 4s infinite linear;
         }
+        @keyframes text-gold-shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .text-gold-gradient {
+          background: linear-gradient(120deg, #fbbf24 10%, #f59e0b 30%, #f97316 50%, #f59e0b 70%, #fbbf24 90%);
+          background-size: 200% auto;
+          animation: text-gold-shimmer 3s infinite linear;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          display: inline-flex;
+          align-items: center;
+          line-height: 1.4;
+          padding: 0.25em 0;
+          margin: -0.25em 0;
+        }
+        @keyframes gold-border-sparkle {
+          0%, 100% { border-color: rgba(245, 158, 11, 0.25); box-shadow: 0 0 6px rgba(245, 158, 11, 0.05); }
+          50% { border-color: rgba(245, 158, 11, 0.85); box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
+        }
+        .sparkle-gold-btn {
+          animation: gold-border-sparkle 2.5s infinite ease-in-out;
+        }
+        @keyframes text-cyan-shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .text-cyan-gradient {
+          background: linear-gradient(120deg, #22d3ee 10%, #06b6d4 30%, #38bdf8 50%, #06b6d4 70%, #22d3ee 90%);
+          background-size: 200% auto;
+          animation: text-cyan-shimmer 3.2s infinite linear;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          display: inline-flex;
+          align-items: center;
+          line-height: 1.4;
+          padding: 0.25em 0;
+          margin: -0.25em 0;
+        }
+        @keyframes cyan-border-glow {
+          0%, 100% { border-color: rgba(6, 182, 212, 0.25); box-shadow: 0 0 6px rgba(6, 182, 212, 0.05); }
+          50% { border-color: rgba(6, 182, 212, 0.85); box-shadow: 0 0 16px rgba(6, 182, 212, 0.35); }
+        }
+        .sparkle-cyan-btn {
+          animation: cyan-border-glow 2.8s infinite ease-in-out;
+        }
       `}} />
 
       <div className="max-w-7xl mx-auto w-full flex justify-between items-center px-4 sm:px-6 lg:px-8">
@@ -298,38 +364,57 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-x-3">
             {navLinks.map((link) => {
               const isLinkActive = isActive(link.href)
+              
+              // Custom highlighting classes for specific tabs
+              let customClasses = ''
+              if (link.href === '/feedback') {
+                customClasses = isLinkActive 
+                  ? 'bg-amber-950/50 sparkle-gold-btn border border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.35)] font-black' 
+                  : 'bg-amber-950/15 sparkle-gold-btn border border-amber-500/25 hover:bg-amber-950/30 hover:border-amber-500/50 font-black'
+              } else if (link.href === '/products') {
+                customClasses = isLinkActive
+                  ? 'bg-cyan-950/50 sparkle-cyan-btn border border-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.35)] font-black'
+                  : 'bg-cyan-950/15 sparkle-cyan-btn border border-cyan-500/25 hover:bg-cyan-950/30 hover:border-cyan-500/50 font-black'
+              } else if (isLinkActive) {
+                customClasses = 'text-cyan-400 bg-cyan-950/40 border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+              } else if (link.href === '/admin') {
+                customClasses = 'text-emerald-400 border-emerald-500/20 hover:text-emerald-300 hover:bg-emerald-950/40 hover:border-emerald-500/40'
+              } else {
+                customClasses = 'text-slate-300 hover:text-white hover:bg-white/5 border-transparent'
+              }
+
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   style={{ padding: '12px 26px' }}
-                  className={`rounded-full text-xs font-bold tracking-wide uppercase leading-none transition-all duration-300 border ${
-                    isLinkActive
-                      ? 'text-cyan-400 bg-cyan-950/40 border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
-                      : link.href === '/admin'
-                        ? 'text-emerald-400 border-emerald-500/20 hover:text-emerald-300 hover:bg-emerald-950/40 hover:border-emerald-500/40'
-                        : 'text-slate-300 hover:text-white hover:bg-white/5 border-transparent'
-                  }`}
+                  className={`rounded-full text-xs font-bold tracking-wide uppercase leading-none transition-all duration-300 ${customClasses}`}
                 >
-                  {link.name}
+                  {link.href === '/feedback' ? (
+                    <span className="text-gold-gradient flex items-center gap-1">✨ {link.name}</span>
+                  ) : link.href === '/products' ? (
+                    <span className="text-cyan-gradient flex items-center gap-1">🐟 {link.name}</span>
+                  ) : (
+                    link.name
+                  )}
                 </Link>
               )
             })}
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
             
             {/* Notification Bell (Visible on all devices) */}
             <div className="relative">
               <button
                 onClick={handleToggleNotifications}
-                className={`p-3 rounded-xl transition-all duration-300 relative border cursor-pointer ${
+                className={`p-2 sm:p-3 rounded-xl transition-all duration-300 relative border cursor-pointer ${
                   showNotifications
                     ? 'bg-blue-950/60 border-blue-500/50 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
                     : 'text-slate-300 hover:bg-white/5 border border-white/5 hover:text-white hover:border-white/10'
                 }`}
-                title="Thông báo từ Quyết"
+                title="Thông báo"
               >
                 <Bell className="w-5.5 h-5.5" />
                 {unreadCount > 0 && (
@@ -341,33 +426,106 @@ export default function Navbar() {
 
               {showNotifications && (
                 <div className="absolute right-0 sm:right-0 -right-12 mt-3 w-[300px] sm:w-80 bg-slate-950/95 backdrop-blur-xl border border-blue-900/40 rounded-2xl shadow-2xl p-4 z-[70] animate-in fade-in slide-in-from-top-3 duration-250">
-                  <div className="flex items-center justify-between pb-3 border-b border-blue-900/20 mb-3">
-                    <span className="font-extrabold text-[10px] tracking-wider uppercase text-cyan-400">Thông báo của Quyết</span>
+                  {/* Compact Header */}
+                  <div className="flex items-center justify-between pb-2 border-b border-blue-900/20 mb-2">
+                    <span className="font-extrabold text-[11px] tracking-wider uppercase text-cyan-400">Thông báo</span>
                     <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Realtime ⚡</span>
                   </div>
-                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
-                    {notifications.length === 0 ? (
-                      <div className="py-8 text-center text-slate-500 text-xs font-semibold leading-relaxed">
-                        <span className="text-2xl block mb-2">🔔</span>
-                        Chưa có thông báo nào từ cửa hàng.
-                      </div>
-                    ) : (
-                      notifications.map(n => (
-                        <div key={n.id} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] hover:border-blue-500/10 transition-all duration-200">
-                          <div className="flex gap-2">
-                            <span className="text-sm shrink-0">
-                              {n.type === 'price_change' ? '🏷️' : n.type === 'new_product' ? '🐟' : '📢'}
-                            </span>
-                            <div className="space-y-1">
-                              <p className="text-xs text-slate-200 font-bold leading-relaxed whitespace-pre-wrap">{n.message}</p>
-                              <p className="text-[9px] text-slate-500 font-extrabold uppercase">
-                                {new Date(n.created_at).toLocaleTimeString('vi-VN')} {new Date(n.created_at).toLocaleDateString('vi-VN')}
-                              </p>
-                            </div>
+
+                  {/* Filter Tabs */}
+                  <div className="flex bg-slate-900/80 border border-white/5 rounded-lg p-0.5 gap-1 mb-2.5 text-[10px] font-bold">
+                    <button
+                      onClick={() => setActiveTab('new')}
+                      className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        activeTab === 'new'
+                          ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/20'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Mới
+                      {notifications.filter(n => !deletedIds.includes(String(n.id)) && !readIds.includes(String(n.id))).length > 0 && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('read')}
+                      className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer ${
+                        activeTab === 'read'
+                          ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/20'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Đã xem
+                    </button>
+                  </div>
+
+                  {/* List Container */}
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {(() => {
+                      const visible = notifications.filter(n => !deletedIds.includes(String(n.id)))
+                      const filtered = visible.filter(n => {
+                        const isRead = readIds.includes(String(n.id))
+                        if (activeTab === 'new') return !isRead
+                        if (activeTab === 'read') return isRead
+                        return true
+                      })
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="py-8 text-center text-slate-500 text-[11px] font-semibold leading-relaxed">
+                            <span className="text-xl block mb-1">🔔</span>
+                            {activeTab === 'new' 
+                              ? 'Không có thông báo mới nào.' 
+                              : 'Chưa có thông báo nào đã xem.'}
                           </div>
-                        </div>
-                      ))
-                    )}
+                        )
+                      }
+
+                      return filtered.map(n => {
+                        const isRead = readIds.includes(String(n.id))
+                        return (
+                          <div
+                            key={n.id}
+                            onClick={() => handleMarkAsRead(n.id)}
+                            className={`group relative p-2.5 border rounded-xl transition-all duration-200 cursor-pointer ${
+                              isRead
+                                ? 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03]'
+                                : 'bg-blue-950/20 border-blue-500/25 hover:bg-blue-950/35 shadow-[inset_0_0_10px_rgba(6,182,212,0.03)]'
+                            }`}
+                          >
+                            <div className="flex gap-2 pr-6">
+                              <span className="text-xs shrink-0 self-start mt-0.5">
+                                {n.type === 'price_change' ? '🏷️' : n.type === 'new_product' ? '🐟' : '📢'}
+                              </span>
+                              <div className="space-y-0.5 min-w-0">
+                                <p className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words ${
+                                  isRead ? 'text-slate-400' : 'text-slate-100 font-semibold'
+                                }`}>
+                                  {n.message}
+                                </p>
+                                <p className="text-[8px] text-slate-500 font-bold uppercase flex items-center gap-1.5">
+                                  <span>
+                                    {new Date(n.created_at).toLocaleTimeString('vi-VN')} {new Date(n.created_at).toLocaleDateString('vi-VN')}
+                                  </span>
+                                  {!isRead && (
+                                    <span className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse inline-block" />
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Client-side Delete Button */}
+                            <button
+                              onClick={(e) => handleDeleteNotification(e, n.id)}
+                              className="absolute top-2.5 right-2.5 p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 cursor-pointer"
+                              title="Xóa thông báo"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )
+                      })
+                    })()}
                   </div>
                 </div>
               )}
@@ -376,7 +534,7 @@ export default function Navbar() {
             {/* Cart with Premium Glowing indicator (Always visible on Mobile & Desktop) */}
             <button 
               onClick={() => setIsOpen(true)}
-              className={`relative p-3 rounded-xl transition-all duration-300 cursor-pointer ${
+              className={`relative p-2 sm:p-3 rounded-xl transition-all duration-300 cursor-pointer ${
                 isOpen 
                   ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25 border border-orange-400/50' 
                   : 'text-slate-300 hover:bg-white/5 border border-white/5 hover:text-white'
@@ -432,12 +590,36 @@ export default function Navbar() {
               )}
             </div>
 
+            {/* Mobile Auth/Profile Button */}
+            <div className="flex md:hidden items-center">
+              {hasHydrated && (
+                session ? (
+                  <Link
+                    href="/profile"
+                    className="relative p-1.5 sm:p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40 flex items-center justify-center text-lg hover:bg-cyan-900/60 transition-all shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+                    title="Hồ sơ cá nhân"
+                  >
+                    🦀
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900" />
+                  </Link>
+                ) : (
+                  <Link
+                    href="/auth"
+                    className="flex items-center justify-center p-2 sm:p-2.5 rounded-xl bg-gradient-to-tr from-orange-500 to-orange-400 border border-orange-300/30 text-white shadow-lg shadow-orange-500/20"
+                    title="Đăng nhập"
+                  >
+                    <LogIn className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                  </Link>
+                )
+              )}
+            </div>
+
             {/* Mobile Hamburger Menu Button */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-3 text-slate-300 hover:text-white hover:bg-white/5 border border-white/5 rounded-xl transition-colors cursor-pointer"
+              className="md:hidden p-2 sm:p-3 text-slate-300 hover:text-white hover:bg-white/5 border border-white/5 rounded-xl transition-colors cursor-pointer"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5.5 h-5.5 sm:w-6 sm:h-6" /> : <Menu className="w-5.5 h-5.5 sm:w-6 sm:h-6" />}
             </button>
           </div>
       </div>
@@ -446,57 +628,43 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-blue-900/30 bg-slate-950/95 backdrop-blur-xl absolute w-full left-0 right-0 shadow-[0_15px_30px_rgba(8,18,45,0.8)] transition-all duration-300 animate-in slide-in-from-top-5 duration-300 z-50">
           <div className="px-4 py-6 space-y-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border ${
-                  isActive(link.href)
-                    ? 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
-                    : link.href === '/admin'
-                      ? 'text-emerald-400 border-emerald-500/30 bg-emerald-950/20'
-                      : 'text-slate-300 border-transparent hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isLinkActive = isActive(link.href)
+              
+              let customMobileClasses = ''
+              if (link.href === '/feedback') {
+                customMobileClasses = isLinkActive
+                  ? 'bg-amber-950/60 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+                  : 'bg-amber-950/20 border-amber-500/30 hover:bg-amber-950/30'
+              } else if (link.href === '/products') {
+                customMobileClasses = isLinkActive
+                  ? 'bg-cyan-950/60 border-cyan-500/60 shadow-[0_0_15px_rgba(6,182,212,0.25)]'
+                  : 'bg-cyan-950/20 border-cyan-500/30 hover:bg-cyan-950/30'
+              } else if (isLinkActive) {
+                customMobileClasses = 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
+              } else if (link.href === '/admin') {
+                customMobileClasses = 'text-emerald-400 border-emerald-500/30 bg-emerald-950/20'
+              } else {
+                customMobileClasses = 'text-slate-300 border-transparent hover:bg-white/5 hover:text-white'
+              }
 
-            {/* Mobile Auth Links rendered in the same clean, uniform style */}
-            {session ? (
-              <>
+              return (
                 <Link
-                  href="/profile"
+                  key={link.href}
+                  href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border ${
-                    isActive('/profile')
-                      ? 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
-                      : 'text-slate-300 border-transparent hover:bg-white/5 hover:text-white'
-                  }`}
+                  className={`block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border ${customMobileClasses}`}
                 >
-                  Tài khoản ({session.user.email?.split('@')[0]})
+                  {link.href === '/feedback' ? (
+                    <span className="text-gold-gradient flex items-center gap-1.5">✨ {link.name}</span>
+                  ) : link.href === '/products' ? (
+                    <span className="text-cyan-gradient flex items-center gap-1.5">🐟 {link.name}</span>
+                  ) : (
+                    link.name
+                  )}
                 </Link>
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    handleLogout()
-                  }}
-                  className="w-full text-left block px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border text-red-400 border-transparent hover:bg-red-500/10 cursor-pointer"
-                >
-                  Đăng xuất
-                </button>
-              </>
-            ) : (
-              <Link
-                href="/auth"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center gap-2.5 text-white text-xs font-black tracking-wide uppercase rounded-xl py-3.5 leading-none transition-all shadow-lg hover:shadow-orange-500/30 hover:scale-102 active:scale-95 group overflow-hidden border border-orange-400/20 animate-shimmer-auth text-center"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Đăng nhập</span>
-              </Link>
-            )}
+              )
+            })}
           </div>
         </div>
       )}
@@ -643,7 +811,7 @@ export default function Navbar() {
                   className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-98 text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider border border-orange-600/10 cursor-pointer"
                 >
                   <Zap className="w-4 h-4 fill-white animate-pulse" />
-                  <span>Tiến hành thanh toán</span>
+                  <span>Đặt hàng ngay</span>
                   <ArrowRight className="w-4 h-4 ml-0.5" />
                 </button>
 
@@ -661,6 +829,9 @@ export default function Navbar() {
 
               <p className="text-[10px] text-center text-slate-500 font-bold uppercase tracking-wider">
                 ⚡ Giao từ Phan Thiết • Cam kết 100% tươi sạch
+              </p>
+              <p className="text-[10px] text-center text-cyan-400/80 font-medium tracking-wide sm:hidden pt-1 animate-pulse">
+                (Vuốt từ dưới lên trên để tiếp tục xem các sản phẩm khác)
               </p>
             </div>
           )}
