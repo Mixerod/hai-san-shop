@@ -199,7 +199,16 @@ export default function AdminPage() {
       showToast('Đã tải ảnh lên thành công!');
     } catch (err: any) {
       console.error(err);
-      alert('Lỗi tải ảnh: ' + err.message);
+      if (err.message?.toLowerCase().includes('row-level security') || err.message?.toLowerCase().includes('violates row-level security')) {
+        alert('💡 Chào Quyết! Tải ảnh không thành công do chính sách bảo mật (RLS) trên Supabase Storage của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy đoạn lệnh sau để mở quyền cho bucket "haisanshop":\n\n' +
+          'CREATE POLICY "Allow public select on haisanshop" ON storage.objects FOR SELECT TO public USING (bucket_id = \'haisanshop\');\n' +
+          'CREATE POLICY "Allow public insert on haisanshop" ON storage.objects FOR INSERT TO public WITH CHECK (bucket_id = \'haisanshop\');\n' +
+          'CREATE POLICY "Allow public update on haisanshop" ON storage.objects FOR UPDATE TO public USING (bucket_id = \'haisanshop\') WITH CHECK (bucket_id = \'haisanshop\');\n' +
+          'CREATE POLICY "Allow public delete on haisanshop" ON storage.objects FOR DELETE TO public USING (bucket_id = \'haisanshop\');'
+        );
+      } else {
+        alert('Lỗi tải ảnh: ' + err.message);
+      }
     } finally {
       setUploadingImage(false);
     }
@@ -236,7 +245,19 @@ export default function AdminPage() {
       });
     } catch (err: any) {
       console.error(err);
-      alert('Lỗi thêm sản phẩm: ' + err.message);
+      if (err.message?.toLowerCase().includes('original_price') || err.message?.toLowerCase().includes('tag') || err.message?.toLowerCase().includes('column')) {
+        alert('💡 Chào Quyết! Lỗi xảy ra do bảng "products" trong database của bạn chưa có hai cột "original_price" (giá gốc để hiển thị giá cũ gạch ngang) và "tag" (nhãn lấp lánh như bán chạy, hàng mới...).\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy đoạn lệnh sau để thêm hai cột này vào database:\n\n' +
+          'ALTER TABLE public.products ADD COLUMN IF NOT EXISTS original_price numeric DEFAULT NULL;\n' +
+          'ALTER TABLE public.products ADD COLUMN IF NOT EXISTS tag text DEFAULT \'none\';'
+        );
+      } else if (err.message?.toLowerCase().includes('row-level security') || err.message?.toLowerCase().includes('violates row-level security')) {
+        alert('💡 Chào Quyết! Thêm sản phẩm không thành công do chính sách bảo mật (RLS) trên bảng "products" của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền thêm sản phẩm:\n\n' +
+          'CREATE POLICY "Allow public insert products" ON public.products FOR INSERT WITH CHECK (true);\n' +
+          'CREATE POLICY "Allow public select products" ON public.products FOR SELECT USING (true);'
+        );
+      } else {
+        alert('Lỗi thêm sản phẩm: ' + err.message);
+      }
     } finally {
       setAddingProduct(false);
     }

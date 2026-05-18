@@ -147,7 +147,12 @@ export default function FeedbackPage() {
       setContent('')
       setRating(5)
     } catch (err: any) {
-      setError(err.message || 'Lỗi khi gửi góp ý.')
+      console.error(err)
+      if (err.message?.toLowerCase().includes('row-level security') || err.message?.toLowerCase().includes('violates row-level security')) {
+        setError('💡 Chào Quyết! Gửi góp ý không thành công do chính sách bảo mật (RLS) trên bảng "feedbacks" của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền:\n\nCREATE POLICY "Allow public insert feedbacks" ON public.feedbacks FOR INSERT WITH CHECK (true);\nCREATE POLICY "Allow public select feedbacks" ON public.feedbacks FOR SELECT USING (true);')
+      } else {
+        setError(err.message || 'Lỗi khi gửi góp ý.')
+      }
     } finally {
       setLoading(false)
     }
@@ -183,7 +188,12 @@ export default function FeedbackPage() {
       setPreorderContact('')
       setPreorderDesc('')
     } catch (err: any) {
-      setError(err.message || 'Lỗi khi gửi yêu cầu đặt trước.')
+      console.error(err)
+      if (err.message?.toLowerCase().includes('row-level security') || err.message?.toLowerCase().includes('violates row-level security')) {
+        setError('💡 Chào Quyết! Gửi yêu cầu không thành công do chính sách bảo mật (RLS) trên bảng "feedbacks" của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền:\n\nCREATE POLICY "Allow public insert feedbacks" ON public.feedbacks FOR INSERT WITH CHECK (true);\nCREATE POLICY "Allow public select feedbacks" ON public.feedbacks FOR SELECT USING (true);')
+      } else {
+        setError(err.message || 'Lỗi khi gửi yêu cầu đặt trước.')
+      }
     } finally {
       setLoading(false)
     }
@@ -210,7 +220,12 @@ export default function FeedbackPage() {
       setChatMessage('')
       fetchChats()
     } catch (err: any) {
-      alert('Không thể gửi tin nhắn: ' + err.message)
+      console.error(err)
+      if (err.message?.toLowerCase().includes('row-level security') || err.message?.toLowerCase().includes('violates row-level security')) {
+        alert('💡 Chào Quyết! Không thể gửi tin nhắn do chính sách bảo mật (RLS) trên bảng "feedbacks" của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền:\n\nCREATE POLICY "Allow public insert feedbacks" ON public.feedbacks FOR INSERT WITH CHECK (true);\nCREATE POLICY "Allow public select feedbacks" ON public.feedbacks FOR SELECT USING (true);')
+      } else {
+        alert('Không thể gửi tin nhắn: ' + err.message)
+      }
     } finally {
       setLoadingChat(false)
     }
@@ -474,25 +489,23 @@ export default function FeedbackPage() {
                 
                 <form onSubmit={handleRegisterChat} className="w-full max-w-xs space-y-4">
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                     <input
                       required
                       type="text"
                       placeholder="Nhập tên của bạn"
                       value={guestNameInput}
                       onChange={(e) => setGuestNameInput(e.target.value)}
-                      className="w-full border border-slate-200/80 bg-white rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
+                      className="w-full border border-slate-200/80 bg-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                     />
                   </div>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                     <input
                       required
                       type="tel"
                       placeholder="Số điện thoại / Zalo"
                       value={guestPhoneInput}
                       onChange={(e) => setGuestPhoneInput(e.target.value)}
-                      className="w-full border border-slate-200/80 bg-white rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
+                      className="w-full border border-slate-200/80 bg-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                     />
                   </div>
                   <button

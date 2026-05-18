@@ -174,7 +174,16 @@ function CheckoutForm() {
 
     } catch (err: any) {
       console.error(err)
-      setError(err.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.')
+      if (err.message?.toLowerCase().includes('row-level security') || err.message?.toLowerCase().includes('violates row-level security')) {
+        setError('💡 Chào Quyết! Lỗi chính sách bảo mật (RLS) trên Supabase của bạn đang chặn quyền đặt hàng.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy đoạn lệnh sau để mở quyền đặt hàng cho cả khách vãng lai và thành viên:\n\n' +
+          'CREATE POLICY "Allow public insert orders" ON public.orders FOR INSERT WITH CHECK (true);\n' +
+          'CREATE POLICY "Allow public select orders" ON public.orders FOR SELECT USING (true);\n' +
+          'CREATE POLICY "Allow public insert order_items" ON public.order_items FOR INSERT WITH CHECK (true);\n' +
+          'CREATE POLICY "Allow public select order_items" ON public.order_items FOR SELECT USING (true);'
+        )
+      } else {
+        setError(err.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.')
+      }
     } finally {
       setLoading(false)
     }

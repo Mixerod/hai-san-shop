@@ -312,6 +312,140 @@ export default function ProductsPage() {
     }
   }
 
+  // Save tag and original_price to Supabase
+  async function handleSaveTagAndOriginalPrice(productId: string, newTag: string, newOriginalPrice: number | null) {
+    setSavingId(productId)
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({ 
+          original_price: newOriginalPrice,
+          tag: newTag
+        })
+        .eq('id', productId)
+        .select()
+
+      if (error) {
+        if (error.message.includes('column') && (error.message.includes('original_price') || error.message.includes('tag'))) {
+          alert('💡 Chào Quyết! Để sử dụng tính năng giá Shopee và tag lấp lánh nổi bật, bạn cần thêm hai cột "original_price" và "tag" vào bảng "products" trong database.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy đoạn lệnh sau:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS original_price numeric DEFAULT NULL;\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS tag text DEFAULT \'none\';')
+          return
+        }
+        throw error
+      }
+
+      if (!data || data.length === 0) {
+        alert('💡 Chào Quyết! Cập nhật không thành công do chính sách bảo mật (RLS) trên Supabase của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền cập nhật sản phẩm:\n\nCREATE POLICY "Allow admin update products" ON public.products FOR UPDATE USING (true) WITH CHECK (true);')
+        return
+      }
+
+      // Update local state
+      setProducts(prev => prev.map(p => p.id === productId ? { 
+        ...p, 
+        original_price: newOriginalPrice ?? undefined, 
+        tag: newTag 
+      } : p))
+      showAdminToast('Đã lưu tag nổi bật và giá gốc thành công! 🛡️')
+    } catch (err: any) {
+      console.error(err)
+      alert('Lỗi cập nhật thiết lập sản phẩm: ' + err.message)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  // Compute products that have unsaved changes (price, original_price, or tag)
+  const unsavedProducts = products.filter(p => {
+    const rawVal = priceInputs[p.id]
+    const hasPriceChange = rawVal !== undefined && parseFloat(rawVal) !== p.price
+
+    const rawOrigVal = originalPriceInputs[p.id]
+    const currentOrigPrice = p.original_price ? String(p.original_price) : ''
+    const hasOrigPriceChange = rawOrigVal !== undefined && rawOrigVal !== currentOrigPrice
+
+    const rawTagVal = tagInputs[p.id]
+    const currentTag = p.tag || 'none'
+    const hasTagChange = rawTagVal !== undefined && rawTagVal !== currentTag
+
+    return hasPriceChange || hasOrigPriceChange || hasTagChange
+  })
+
+  // Save all modified products in a single transaction-like action
+  async function handleSaveAllChanges() {
+    if (unsavedProducts.length === 0) return
+
+    setSavingId('global_all')
+    try {
+      const updatePromises = unsavedProducts.map(async (p) => {
+        const rawVal = priceInputs[p.id] !== undefined ? priceInputs[p.id] : String(p.price)
+        const newPrice = parseFloat(rawVal)
+        if (isNaN(newPrice) || newPrice <= 0) {
+          throw new Error(`Giá sản phẩm "${p.name}" không hợp lệ!`)
+        }
+
+        const rawOrigVal = originalPriceInputs[p.id]
+        const newOriginalPrice = rawOrigVal ? parseFloat(rawOrigVal) : null
+
+        const newTag = tagInputs[p.id] !== undefined ? tagInputs[p.id] : (p.tag || 'none')
+
+        const { data, error } = await supabase
+          .from('products')
+          .update({ 
+            price: newPrice,
+            original_price: newOriginalPrice,
+            tag: newTag
+          })
+          .eq('id', p.id)
+          .select()
+
+        if (error) throw error
+        if (!data || data.length === 0) {
+          throw new Error(`Chính sách bảo mật (RLS) chặn cập nhật sản phẩm "${p.name}".`)
+        }
+
+        return { id: p.id, newPrice, newOriginalPrice, newTag }
+      })
+
+      const results = await Promise.all(updatePromises)
+
+      // Update local state for all successful items
+      setProducts(prev => prev.map(p => {
+        const match = results.find(r => r.id === p.id)
+        if (match) {
+          return {
+            ...p,
+            price: match.newPrice,
+            original_price: match.newOriginalPrice ?? undefined,
+            tag: match.newTag
+          }
+        }
+        return p
+      }))
+
+      showAdminToast(`Đã lưu thành công ${unsavedProducts.length} thay đổi! 🎉`)
+    } catch (err: any) {
+      console.error(err)
+      alert('Lỗi khi lưu các thay đổi: ' + err.message)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  // Discard all unsaved changes and reset inputs to current DB state
+  function handleDiscardAllChanges() {
+    const priceInps: Record<string, string> = {}
+    const origPriceInps: Record<string, string> = {}
+    const tagInps: Record<string, string> = {}
+    products.forEach(p => {
+      priceInps[p.id] = String(p.price)
+      origPriceInps[p.id] = p.original_price ? String(p.original_price) : ''
+      tagInps[p.id] = p.tag || 'none'
+    })
+    setPriceInputs(priceInps)
+    setOriginalPriceInputs(origPriceInps)
+    setTagInputs(tagInps)
+    showAdminToast('Đã khôi phục các thay đổi chưa lưu! ↩️')
+  }
+
   // Send broadcast notification to Supabase
   async function handleSendNotification(messageText: string, typeVal: string) {
     if (!messageText.trim()) return
@@ -1053,6 +1187,52 @@ export default function ProductsPage() {
         <div className="fixed top-24 right-6 bg-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-emerald-500/20 z-50 animate-in slide-in-from-right-8 font-semibold flex items-center gap-2 border border-emerald-400/20">
           <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</span>
           Đã thêm vào giỏ hàng
+        </div>
+      )}
+
+      {/* Floating Unsaved Changes Dashboard */}
+      {isAdmin && unsavedProducts.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-xl backdrop-blur-lg bg-slate-900/95 border border-slate-700/50 shadow-2xl rounded-2xl px-5 py-4 flex items-center justify-between gap-4 text-white z-[90] animate-in slide-in-from-bottom-12 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+              <span className="text-lg">💡</span>
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-blue-400">Chế độ Admin</p>
+              <p className="text-sm font-bold text-slate-200">
+                Có <span className="text-amber-400 font-black">{unsavedProducts.length}</span> thay đổi chưa lưu
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={savingId === 'global_all'}
+              onClick={handleDiscardAllChanges}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-50 text-slate-300 font-black text-xs rounded-xl border border-slate-700/50 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <span>Hủy</span>
+            </button>
+            <button
+              type="button"
+              disabled={savingId === 'global_all'}
+              onClick={handleSaveAllChanges}
+              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-95 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              {savingId === 'global_all' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang lưu...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Lưu tất cả</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </main>
