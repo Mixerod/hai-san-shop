@@ -96,7 +96,7 @@ export default function FeedbackPage() {
       const { data, error } = await supabase
         .from('feedbacks')
         .select('*')
-        .or(`title.eq.[Chat] ${identifier},title.eq.[Reply] ${identifier}`)
+        .or(`content.ilike.[Chat] ${identifier}%,content.ilike.[Reply] ${identifier}%`)
         .order('created_at', { ascending: true })
 
       if (error) throw error
@@ -135,8 +135,7 @@ export default function FeedbackPage() {
         .from('feedbacks')
         .insert({
           user_id: session?.user?.id || null,
-          title: `[Feedback] ${title.trim()}`,
-          content: content.trim(),
+          content: `[Feedback] ${title.trim()}\n${content.trim()}`,
           rating: rating
         })
 
@@ -175,8 +174,7 @@ export default function FeedbackPage() {
         .from('feedbacks')
         .insert({
           user_id: session?.user?.id || null,
-          title: `[Pre-Order] ${preorderName.trim()}`,
-          content: structuredContent,
+          content: `[Pre-Order] ${preorderName.trim()}\n${structuredContent}`,
           rating: 5
         })
 
@@ -211,8 +209,7 @@ export default function FeedbackPage() {
         .from('feedbacks')
         .insert({
           user_id: session?.user?.id || null,
-          title: `[Chat] ${identifier}`,
-          content: chatMessage.trim(),
+          content: `[Chat] ${identifier}\n${chatMessage.trim()}`,
           rating: 5
         })
 
@@ -529,7 +526,7 @@ export default function FeedbackPage() {
                     </div>
                   ) : (
                     chatHistory.map((chat) => {
-                      const isReply = chat.title.startsWith('[Reply]')
+                      const isReply = (chat.content as string).startsWith('[Reply]')
                       return (
                         <div key={chat.id} className={`flex flex-col ${isReply ? 'items-start' : 'items-end'}`}>
                           <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
@@ -537,7 +534,7 @@ export default function FeedbackPage() {
                               ? 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm' 
                               : 'bg-emerald-600 text-white rounded-tr-sm'
                           }`}>
-                            {chat.content}
+                            {(chat.content as string).replace(/^\[(?:Chat|Reply)\][^\n]*\n?/, '')}
                           </div>
                           <span className="text-[9px] text-slate-400 font-semibold mt-1 px-1">
                             {new Date(chat.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}

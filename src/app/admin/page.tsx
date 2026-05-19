@@ -361,8 +361,7 @@ export default function AdminPage() {
       const { error } = await supabase
         .from('feedbacks')
         .insert({
-          title: `[Reply] ${selectedChatUser}`,
-          content: replyMessage.trim(),
+          content: `[Reply] ${selectedChatUser}\n${replyMessage.trim()}`,
           rating: 5
         });
 

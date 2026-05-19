@@ -526,7 +526,9 @@ function CheckoutForm() {
                 </div>
                 <div className="bg-blue-50 border border-blue-100 py-2.5 px-4 rounded-lg inline-flex items-center justify-center gap-2 block max-w-xs mx-auto">
                   <span className="text-sm text-slate-600">Nội dung CK:</span>
-                  <span className="font-bold text-blue-600">{phone || '(Vui lòng nhập SĐT)'}</span>
+                  <span className="font-bold text-blue-600">
+                    {name && phone ? `${name} - ${phone}` : (name || phone ? `${name || ''}${phone || ''}` : '(Tên + SĐT của bạn)')}
+                  </span>
                 </div>
               </div>
             </div>

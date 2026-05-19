@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // Thêm suppressHydrationWarning vào đây để React lờ đi những class bị extension cài lén vào
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className="bg-slate-50 text-slate-800 min-h-screen w-full flex flex-col items-stretch">
         <Navbar />
         <CartExitGuard />

@@ -144,10 +144,14 @@ function OrderSuccessContent() {
     )
   }
 
-  // Parse thông tin SĐT và Hình thức nhận hàng từ field note 
+  // Parse thông tin Tên, SĐT và Hình thức nhận hàng từ field note 
   const noteLines = order.note ? order.note.split('\n') : []
+  const nameLine = noteLines.find(l => l.startsWith('Tên:'))
+  const nameStr = nameLine ? nameLine.replace('Tên:', '').trim() : ''
   const phoneLine = noteLines.find(l => l.startsWith('SĐT:'))
-  const phoneStr = phoneLine ? phoneLine.replace('SĐT:', '').trim() : '(SĐT của bạn)'
+  const phoneStr = phoneLine ? phoneLine.replace('SĐT:', '').trim() : ''
+  
+  const transferContent = nameStr && phoneStr ? `${nameStr} - ${phoneStr}` : (nameStr || phoneStr || '(Tên + SĐT của bạn)')
   
   const deliveryLine = noteLines.find(l => l.startsWith('Nhận hàng:'))
   const deliveryStr = deliveryLine ? deliveryLine.replace('Nhận hàng:', '').trim() : 'Chưa rõ'
@@ -249,7 +253,7 @@ function OrderSuccessContent() {
                   
                   <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100 flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-blue-600/80 font-medium">Nội dung CK:</span>
-                    <span className="font-bold text-blue-700 bg-white px-2.5 py-1 rounded-md shadow-sm">{phoneStr}</span>
+                    <span className="font-bold text-blue-700 bg-white px-2.5 py-1 rounded-md shadow-sm">{transferContent}</span>
                   </div>
                 </div>
               </>

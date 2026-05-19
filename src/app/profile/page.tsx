@@ -47,6 +47,7 @@ type Order = {
   total_amount: number
   status: string
   payment_method: string
+  note: string
   created_at: string
   order_items: OrderItem[]
 }
@@ -667,22 +668,31 @@ function ProfileContent() {
                       </div>
 
                       {/* Payment Info Dropdown */}
-                      {showPaymentInfo === order.id && (
-                        <div className="px-5 sm:px-10 pb-8 animate-in slide-in-from-top-2">
-                          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-sm text-orange-900 shadow-inner">
-                            <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
-                              <Info className="w-4 h-4" />
-                              Thông tin thanh toán
-                            </h4>
-                            <ul className="space-y-2 font-medium">
-                              <li>• <strong className="text-orange-700">Tiền mặt:</strong> Thanh toán trực tiếp cho shipper khi nhận hàng.</li>
-                              <li>• <strong className="text-orange-700">Chuyển khoản:</strong> Ngân hàng Vietcombank - STK <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-orange-200">123456789</span></li>
-                              <li>• <strong className="text-orange-700">Chủ tài khoản:</strong> NGUYEN VAN A</li>
-                              <li>• <strong className="text-orange-700">Nội dung CK:</strong> <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-orange-200 text-blue-700">DH {order.id.slice(0, 8).toUpperCase()}</span></li>
-                            </ul>
+                      {showPaymentInfo === order.id && (() => {
+                        const noteLines = order.note ? order.note.split('\n') : []
+                        const nameLine = noteLines.find(l => l.startsWith('Tên:'))
+                        const nameStr = nameLine ? nameLine.replace('Tên:', '').trim() : ''
+                        const phoneLine = noteLines.find(l => l.startsWith('SĐT:'))
+                        const phoneStr = phoneLine ? phoneLine.replace('SĐT:', '').trim() : ''
+                        const transferContent = nameStr && phoneStr ? `${nameStr} - ${phoneStr}` : (nameStr || phoneStr || '(Tên + SĐT của bạn)')
+                        return (
+                          <div className="px-5 sm:px-10 pb-8 animate-in slide-in-from-top-2">
+                            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-sm text-orange-900 shadow-inner">
+                              <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
+                                <Info className="w-4 h-4" />
+                                Thông tin thanh toán
+                              </h4>
+                              <ul className="space-y-2 font-medium">
+                                <li>• <strong className="text-orange-700">Tiền mặt:</strong> Thanh toán trực tiếp cho shipper khi nhận hàng.</li>
+                                <li>• <strong className="text-orange-700">Chuyển khoản:</strong> Ngân hàng Agribank - STK <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-orange-200">4801205175150</span></li>
+                                <li>• <strong className="text-orange-700">Ví điện tử:</strong> Momo - SĐT <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-orange-200">0964671009</span></li>
+                                <li>• <strong className="text-orange-700">Chủ tài khoản:</strong> LÊ MINH QUYẾT</li>
+                                <li>• <strong className="text-orange-700">Nội dung CK:</strong> <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-orange-200 text-blue-700">{transferContent}</span></li>
+                              </ul>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )
+                      })()}
 
                       <div className="px-5 sm:px-10 pb-10 pt-6">
                         <div className="flex items-center gap-3 mb-6">
