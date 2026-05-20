@@ -30,7 +30,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [quantities, setQuantities] = useState<Record<string, string>>({})
   const [added, setAdded] = useState<string | null>(null)
-  const { add, items } = useCart()
+  const { add, items, setIsOpen } = useCart()
 
   // Quantity step and min helper functions
   const getQtyStep = (unit: string) => {
@@ -106,7 +106,8 @@ export default function ProductsPage() {
     }
     
     add({ id: p.id, name: p.name, price: p.price, unit: p.unit, quantity })
-    router.push('/cart')
+    setIsOpen(false)
+    router.push('/checkout')
   }
 
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0)
@@ -557,8 +558,8 @@ export default function ProductsPage() {
             Hải sản chất lượng từ vùng biển Phan Thiết
           </p>
         </div>
-        <Link 
-          href="/cart" 
+        <button 
+          onClick={() => setIsOpen(true)} 
           className="relative bg-white border border-gray-200/80 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-300 px-6 py-3.5 rounded-2xl flex items-center gap-3 group active:scale-95 animate-in fade-in"
         >
           <span className="text-xl group-hover:scale-120 group-hover:rotate-6 transition-all duration-300">🛒</span> 
@@ -568,7 +569,7 @@ export default function ProductsPage() {
               {cartCount}
             </span>
           )}
-        </Link>
+        </button>
       </div>
 
       {/* Admin Quick Broadcast Board */}

@@ -815,22 +815,11 @@ export default function Navbar() {
                     setIsOpen(false)
                     router.push('/checkout')
                   }}
-                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-98 text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider border border-orange-600/10 cursor-pointer"
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-98 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider border border-orange-600/10 cursor-pointer"
                 >
                   <Zap className="w-4 h-4 fill-white animate-pulse" />
                   <span>Đặt hàng ngay</span>
                   <ArrowRight className="w-4 h-4 ml-0.5" />
-                </button>
-
-                {/* View full Cart */}
-                <button
-                  onClick={() => {
-                    setIsOpen(false)
-                    router.push('/cart')
-                  }}
-                  className="w-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 active:scale-98 text-slate-200 font-extrabold py-3 rounded-xl transition-all text-xs uppercase tracking-wider cursor-pointer"
-                >
-                  Xem chi tiết giỏ hàng
                 </button>
               </div>
 

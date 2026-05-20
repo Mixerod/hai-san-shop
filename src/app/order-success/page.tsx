@@ -168,8 +168,8 @@ function OrderSuccessContent() {
             <CheckCircle2 className="w-16 h-16 text-white" />
           </div>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">Tuyệt vời!</h1>
-        <p className="text-xl text-slate-600 mb-6 font-medium">Đơn hàng của bạn đã được ghi nhận thành công.</p>
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">Cảm ơn bạn!</h1>
+        <p className="text-xl text-slate-600 mb-6 font-medium">Đơn hàng hải sản của bạn đã được đặt thành công. Chúng tôi vô cùng trân trọng và sẽ sớm liên hệ để giao những phần hải sản tươi ngon nhất đến bạn!</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">

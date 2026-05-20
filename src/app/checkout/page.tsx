@@ -15,11 +15,14 @@ import {
   ChevronRight, 
   ShoppingCart,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Minus,
+  Trash2
 } from 'lucide-react'
 
 function CheckoutForm() {
-  const { items, total, clear } = useCart()
+  const { items, total, clear, updateQty, remove } = useCart()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -37,8 +40,28 @@ function CheckoutForm() {
     }
     return acc
   }, 0)
+
+  const getQtyStep = (unit: string) => {
+    const u = (unit || '').toLowerCase()
+    return (u.includes('kg') || u.includes('ký') || u.includes('ky') || u.includes('kg/')) ? 0.5 : 1
+  }
+
+  const getQtyMin = (unit: string) => getQtyStep(unit)
+
+  const handleDecreaseQty = (id: string, currentQty: number, unit: string) => {
+    const step = getQtyStep(unit)
+    const min = step
+    const newVal = Math.max(min, Math.round((currentQty - step) * 10) / 10)
+    updateQty(id, newVal)
+  }
+
+  const handleIncreaseQty = (id: string, currentQty: number, unit: string) => {
+    const step = getQtyStep(unit)
+    const newVal = Math.round((currentQty + step) * 10) / 10
+    updateQty(id, newVal)
+  }
   
-  const [deliveryMethod, setDeliveryMethod] = useState<'company' | 'viettel' | 'hcm_inner'>('company')
+  const [deliveryMethod, setDeliveryMethod] = useState<'company' | 'viettel'>('company')
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'transfer'>('cod')
   
   const [receiverPhone, setReceiverPhone] = useState('')
@@ -148,10 +171,8 @@ function CheckoutForm() {
       let deliveryDetail = ''
       if (deliveryMethod === 'company') {
         deliveryDetail = 'Tại công ty'
-      } else if (deliveryMethod === 'hcm_inner') {
-        deliveryDetail = `Giao nội thành TPHCM - ĐC: ${address} - SĐT nhận: ${receiverPhone}`
       } else {
-        deliveryDetail = `Viettel Post - ĐC: ${address}`
+        deliveryDetail = `Viettel Post (nội thành TPHCM) - ĐC: ${address} - SĐT nhận: ${receiverPhone}`
       }
 
       const finalNote = `Tên: ${name}\nSĐT: ${phone}\nNhận hàng: ${deliveryDetail}\nGhi chú khách: ${note}`
@@ -256,18 +277,56 @@ function CheckoutForm() {
               <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
               Đơn hàng của bạn
             </h2>
-            <div className="space-y-4 mb-5">
-              {items.map((item) => (
-                <div key={item.id} className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <p className="font-semibold text-slate-800">{item.name}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                      {item.quantity} {item.unit} × {item.price.toLocaleString('vi-VN')}đ
+            <div className="space-y-4 mb-5 divide-y divide-slate-100">
+              {items.map((item, idx) => (
+                <div key={item.id} className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 ${idx > 0 ? 'pt-4' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-extrabold text-slate-850 text-sm sm:text-base truncate">{item.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => remove(item.id)}
+                        className="text-slate-400 hover:text-red-500 transition-colors p-1 cursor-pointer shrink-0 animate-pulse hover:animate-none"
+                        title="Xóa khỏi đơn hàng"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 font-semibold">
+                      Đơn giá: {item.price.toLocaleString('vi-VN')}đ/{item.unit}
                     </p>
                   </div>
-                  <span className="font-bold text-slate-700 ml-4">
-                    {(item.price * item.quantity).toLocaleString('vi-VN')}đ
-                  </span>
+                  
+                  <div className="flex items-center justify-between sm:justify-end gap-4">
+                    {/* Quantity Adjustment Controls */}
+                    <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-lg p-0.5 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => handleDecreaseQty(item.id, item.quantity, item.unit)}
+                        className="w-7 h-7 rounded-md hover:bg-slate-200 active:scale-90 text-slate-650 transition-all font-black flex items-center justify-center select-none cursor-pointer"
+                        disabled={item.quantity <= getQtyMin(item.unit)}
+                        style={{ opacity: item.quantity <= getQtyMin(item.unit) ? 0.35 : 1 }}
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      
+                      <span className="w-11 text-center text-slate-800 font-extrabold text-xs select-none">
+                        {item.quantity} <span className="text-[9px] text-slate-500 font-normal">{item.unit}</span>
+                      </span>
+                      
+                      <button
+                        type="button"
+                        onClick={() => handleIncreaseQty(item.id, item.quantity, item.unit)}
+                        className="w-7 h-7 rounded-md hover:bg-slate-200 active:scale-90 text-slate-650 transition-all font-black flex items-center justify-center select-none cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    
+                    <span className="font-extrabold text-slate-800 text-sm sm:text-base whitespace-nowrap min-w-[85px] text-right">
+                      {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -330,87 +389,7 @@ function CheckoutForm() {
                 <p className="text-sm text-slate-500 mt-2 ml-8">Phí ship ~5.000–10.000đ chia đều theo đơn chung, thu khi nhận hàng.</p>
               </label>
 
-              {/* HCM Inner Delivery */}
-              <label 
-                className={`block border rounded-xl p-4 transition-all duration-200 ${
-                  totalKg < 5 
-                    ? 'border-slate-200 bg-slate-50/50 opacity-60 cursor-not-allowed'
-                    : deliveryMethod === 'hcm_inner' 
-                      ? 'border-blue-500 bg-blue-50 cursor-pointer' 
-                      : 'border-slate-200 hover:border-slate-300 bg-white cursor-pointer'
-                }`}
-              >
-                <input 
-                  type="radio" 
-                  name="delivery" 
-                  className="hidden" 
-                  disabled={totalKg < 5}
-                  checked={deliveryMethod === 'hcm_inner'} 
-                  onChange={() => setDeliveryMethod('hcm_inner')} 
-                />
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    totalKg < 5
-                      ? 'border-slate-200 bg-slate-100'
-                      : deliveryMethod === 'hcm_inner' 
-                        ? 'border-blue-500' 
-                        : 'border-slate-300'
-                  }`}>
-                    {deliveryMethod === 'hcm_inner' && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <Building2 className={`w-5 h-5 ${
-                        totalKg < 5
-                          ? 'text-slate-300'
-                          : deliveryMethod === 'hcm_inner' 
-                            ? 'text-blue-600' 
-                            : 'text-slate-400'
-                      }`} />
-                      <span className={`font-semibold text-sm ${
-                        totalKg < 5
-                          ? 'text-slate-400 font-bold'
-                          : deliveryMethod === 'hcm_inner' 
-                            ? 'text-blue-700' 
-                            : 'text-slate-700'
-                      }`}>Giao tận nơi (Nội thành TPHCM)</span>
-                    </div>
-                    {totalKg < 5 ? (
-                      <span className="text-[11px] text-red-500 font-extrabold mt-1 uppercase tracking-wider flex items-center gap-1">
-                        ⚠️ Giao tận nơi: Cần mua thêm ${(5 - totalKg).toFixed(1)}kg hải sản nữa để đạt mức tối thiểu (5kg).
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-blue-600 font-bold mt-0.5 uppercase tracking-wider">Chỉ giao đơn trên 5kg</span>
-                    )}
-                  </div>
-                </div>
-                {totalKg >= 5 && (
-                  <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'hcm_inner' ? 'max-h-64 mt-3' : 'max-h-0'}`}>
-                    <div className="ml-8 space-y-3">
-                      <input
-                        required={deliveryMethod === 'hcm_inner'}
-                        type="text"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        placeholder="Địa chỉ giao hàng (Số nhà, tên đường, quận...)"
-                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-sm text-slate-800 placeholder-slate-400"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <input
-                        required={deliveryMethod === 'hcm_inner'}
-                        type="tel"
-                        value={receiverPhone}
-                        onChange={(e) => setReceiverPhone(e.target.value)}
-                        placeholder="Số điện thoại người nhận"
-                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-sm text-slate-800 placeholder-slate-400"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                  </div>
-                )}
-              </label>
-
-              {/* Viettel Post Delivery */}
+              {/* Viettel Post - Nội thành TPHCM Delivery */}
               <label 
                 className={`block border rounded-xl p-4 transition-all duration-200 ${
                   totalKg < 5 
@@ -453,26 +432,37 @@ function CheckoutForm() {
                           : deliveryMethod === 'viettel' 
                             ? 'text-blue-700' 
                             : 'text-slate-700'
-                      }`}>Giao tận nơi (Viettel Post)</span>
+                      }`}>Giao tận nơi (Viettel Post - nội thành TPHCM)</span>
                     </div>
                     {totalKg < 5 ? (
                       <span className="text-[11px] text-red-500 font-extrabold mt-1 uppercase tracking-wider flex items-center gap-1">
                         ⚠️ Giao tận nơi: Cần mua thêm ${(5 - totalKg).toFixed(1)}kg hải sản nữa để đạt mức tối thiểu (5kg).
                       </span>
                     ) : (
-                      <p className="text-sm text-slate-500 mt-2 ml-8">Phí ship Viettel Post tính theo khoảng cách, liên hệ báo giá.</p>
+                      <p className="text-xs text-slate-500 mt-1 ml-7">
+                        Chỉ giao đơn hàng trên 5kg qua Viettel Post khu vực nội thành TPHCM. Phí vận chuyển tính theo khoảng cách của Viettel Post, liên hệ báo giá.
+                      </p>
                     )}
                   </div>
                 </div>
                 {totalKg >= 5 && (
-                  <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'viettel' ? 'max-h-32 mt-3' : 'max-h-0'}`}>
-                    <div className="ml-8">
+                  <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'viettel' ? 'max-h-64 mt-3' : 'max-h-0'}`}>
+                    <div className="ml-7 space-y-3">
                       <input
                         required={deliveryMethod === 'viettel'}
                         type="text"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        placeholder="Nhập địa chỉ giao hàng chi tiết..."
+                        placeholder="Địa chỉ giao hàng chi tiết (Số nhà, tên đường, phường, quận...)"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-sm text-slate-800 placeholder-slate-400"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <input
+                        required={deliveryMethod === 'viettel'}
+                        type="tel"
+                        value={receiverPhone}
+                        onChange={(e) => setReceiverPhone(e.target.value)}
+                        placeholder="Số điện thoại người nhận"
                         className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-sm text-slate-800 placeholder-slate-400"
                         onClick={(e) => e.stopPropagation()}
                       />

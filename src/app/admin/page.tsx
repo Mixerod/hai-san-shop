@@ -26,7 +26,13 @@ import {
   Image as ImageIcon,
   MessageSquare,
   Star,
-  Fish
+  Fish,
+  Phone,
+  User,
+  MapPin,
+  AlertCircle,
+  ClipboardList,
+  ClipboardCopy
 } from "lucide-react";
 
 type OrderItem = {
@@ -1253,34 +1259,60 @@ export default function AdminPage() {
                         <td className="px-4 md:px-6 py-4 md:py-5 whitespace-nowrap font-mono text-gray-500 font-medium text-xs">
                           #{order.id.slice(0, 8).toUpperCase()}
                         </td>
-                        <td className="px-4 md:px-6 py-4 md:py-5 whitespace-normal break-words min-w-[200px]">
-                          <p className="font-bold text-gray-900">
-                            {order.profiles?.full_name || "Khách (Xem ghi chú)"}
-                          </p>
-                          <p
-                            className="text-xs text-gray-500 mt-1 break-words whitespace-normal"
-                          >
-                            {order.note || "Không có ghi chú"}
-                          </p>
+                        {/* Khách Hàng - Có icon phân cấp rõ ràng */}
+                        <td className="px-4 md:px-6 py-4 md:py-5 min-w-[210px]">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <p className="font-bold text-gray-900 text-sm leading-tight">
+                                {order.profiles?.full_name || "Khách vãng lai"}
+                              </p>
+                            </div>
+                            {order.profiles?.phone && (
+                              <div className="flex items-center gap-1.5">
+                                <Phone className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                <p className="text-xs text-gray-600 font-semibold">{order.profiles.phone}</p>
+                              </div>
+                            )}
+                            {/* Loại giao hàng */}
+                            <div className="flex items-center gap-1.5">
+                              {getDeliveryType(order) === 'company'
+                                ? <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                                : <Package className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                              }
+                              <p className="text-[11px] text-gray-500 font-medium">
+                                {getDeliveryType(order) === 'company' ? 'Nhận tại công ty' : 'Giao tận nơi'}
+                              </p>
+                            </div>
+                            {/* Ghi chú - nổi bật nếu có */}
+                            {order.note && (
+                              <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mt-1">
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                <p className="text-[11px] text-amber-800 font-semibold break-words whitespace-normal leading-relaxed">
+                                  {order.note}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-4 md:px-6 py-4 md:py-5 min-w-[220px]">
-                          <ul className="space-y-1.5">
+
+                        {/* Món hàng - To và nổi bật */}
+                        <td className="px-4 md:px-6 py-4 md:py-5 min-w-[200px]">
+                          <ul className="space-y-2">
                             {order.order_items?.map((item) => (
-                              <li
-                                key={item.id}
-                                className="text-sm border-b border-gray-100 last:border-0 pb-1 last:pb-0"
-                              >
-                                <span className="font-semibold text-gray-800">
+                              <li key={item.id} className="flex items-center justify-between gap-2 border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                                <span className="font-bold text-gray-900 text-sm">
                                   {item.products?.name || "SP"}
-                                </span>{" "}
-                                <span className="text-gray-500">
-                                  (x{item.quantity} {item.products?.unit || "kg"} -{" "}
-                                  {item.price_at_time.toLocaleString("vi-VN")}đ)
+                                </span>
+                                <span className="shrink-0 text-sm font-black text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-2 py-0.5">
+                                  {item.quantity} {item.products?.unit || "kg"}
                                 </span>
                               </li>
                             ))}
                           </ul>
                         </td>
+
+                        {/* Tổng tiền */}
                         <td className="px-6 py-5 whitespace-nowrap text-right">
                           <p className="font-bold text-gray-900 text-base">
                             {order.total_amount.toLocaleString("vi-VN")}đ
@@ -1291,8 +1323,13 @@ export default function AdminPage() {
                               : "Bank (CK)"}
                           </p>
                         </td>
+
+                        {/* Ngày đặt - Chỉ hiện ngày + giờ:phút, bỏ giây */}
                         <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500 font-medium">
-                          {new Date(order.created_at).toLocaleString("vi-VN")}
+                          {new Date(order.created_at).toLocaleString("vi-VN", {
+                            year: 'numeric', month: '2-digit', day: '2-digit',
+                            hour: '2-digit', minute: '2-digit'
+                          })}
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap text-center align-middle">
                           <div className="relative flex flex-col items-center gap-2 w-full max-w-[140px] mx-auto">
@@ -1505,7 +1542,12 @@ export default function AdminPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200/80 pb-4 mb-4 gap-3">
                 <div>
                   <h3 className="font-extrabold text-gray-800 text-lg">Tổng khối lượng cần chuẩn bị</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Tổng hợp từ các đơn hàng nằm trong mẻ hiện tại.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {prepProductFilter !== 'all'
+                      ? <><span className="text-orange-600 font-bold">Đang lọc: {prepProductFilter}</span> — bấm lại để bỏ lọc</>
+                      : 'Tổng hợp từ các đơn hàng nằm trong mẻ hiện tại.'
+                    }
+                  </p>
                 </div>
                 {preparationData.totalKg > 0 && (
                   <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md rounded-2xl px-5 py-3 flex flex-col items-end gap-0.5">
@@ -1521,22 +1563,116 @@ export default function AdminPage() {
               {preparationData.aggregatedProducts.length === 0 ? (
                 <p className="text-gray-500 italic">Không có dữ liệu phù hợp với bộ lọc hiện tại.</p>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {preparationData.aggregatedProducts.map(([name, data]) => (
-                    <div key={name} className="bg-orange-50 border border-orange-200/80 rounded-xl p-4 text-center shadow-[0_2px_8px_rgba(249,115,22,0.03)] hover:scale-[1.02] transition-transform">
-                      <p className="text-xs text-orange-800 font-bold uppercase mb-1 line-clamp-1">{name}</p>
-                      <p className="text-2xl font-black text-orange-600">{data.totalQty} <span className="text-sm font-semibold">{data.unit}</span></p>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <p className="text-[11px] text-gray-400 font-semibold mb-3">
+                    👆 Bấm vào thẻ món để lọc nhanh danh sách đơn bên dưới
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {/* Thẻ "Tất cả" để reset filter */}
+                    <button
+                      onClick={() => setPrepProductFilter('all')}
+                      className={`rounded-xl p-4 text-center border-2 transition-all duration-150 active:scale-95 ${
+                        prepProductFilter === 'all'
+                          ? 'bg-gray-800 border-gray-700 text-white shadow-lg'
+                          : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
+                      }`}
+                    >
+                      <p className="text-[10px] font-bold uppercase tracking-wide mb-1">
+                        {prepProductFilter === 'all' ? '✓ Đang xem' : 'Bỏ lọc'}
+                      </p>
+                      <p className="text-xl font-black">Tất cả</p>
+                    </button>
+
+                    {preparationData.aggregatedProducts.map(([name, data]) => {
+                      const isActive = prepProductFilter === name;
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => setPrepProductFilter(isActive ? 'all' : name)}
+                          className={`rounded-xl p-4 text-center border-2 transition-all duration-150 active:scale-95 cursor-pointer ${
+                            isActive
+                              ? 'bg-orange-500 border-orange-400 text-white shadow-lg shadow-orange-500/30 scale-[1.03]'
+                              : 'bg-orange-50 border-orange-200/80 text-orange-800 hover:border-orange-400 hover:bg-orange-100 hover:scale-[1.02]'
+                          }`}
+                        >
+                          <p className={`text-[10px] font-bold uppercase mb-1 line-clamp-1 ${isActive ? 'text-orange-100' : 'text-orange-700'}`}>
+                            {isActive ? `✓ ${name}` : name}
+                          </p>
+                          <p className={`text-2xl font-black ${isActive ? 'text-white' : 'text-orange-600'}`}>
+                            {data.totalQty}{' '}
+                            <span className={`text-sm font-semibold ${isActive ? 'text-orange-100' : ''}`}>{data.unit}</span>
+                          </p>
+                          {isActive && (
+                            <p className="text-[9px] text-orange-200 font-bold mt-1 uppercase tracking-wide">Bấm để bỏ lọc</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
 
             {/* Chi tiết đơn hàng trong mẻ này */}
             <div>
-              <h3 className="font-bold text-gray-800 border-b border-gray-200 pb-2 mb-4 text-lg mt-8">
-                Chi tiết đơn hàng thuộc mẻ này ({preparationData.includedOrders.length} đơn)
-              </h3>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200 pb-3 mb-4 mt-8">
+                <h3 className="font-bold text-gray-800 text-lg">
+                  Chi tiết đơn hàng ({preparationData.includedOrders.length} đơn)
+                </h3>
+                {/* Nút xuất tin nhắn order tổng */}
+                {preparationData.includedOrders.length > 0 && (
+                  <button
+                    onClick={() => {
+                      // Gom từng khách: Tên: số lượng món1, số lượng món2
+                      const lines = preparationData.includedOrders.map(order => {
+                        const name = getCleanCustomerName(order);
+                        const items = order.order_items
+                          .filter(item => prepProductFilter === 'all' || (item.products?.name || '') === prepProductFilter)
+                          .map(item => {
+                            const qty = item.quantity;
+                            const unit = item.products?.unit || 'kg';
+                            const pName = item.products?.name || 'SP';
+                            return `${qty}${unit} ${pName}`;
+                          });
+                        if (items.length === 0) return null;
+                        return `${name}: ${items.join(', ')}`;
+                      }).filter(Boolean);
+                      const msg = lines.join('\n');
+                      navigator.clipboard.writeText(msg);
+                      showToast('Đã copy tin nhắn order tổng! 📋');
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-sm active:scale-95 transition-all print:hidden"
+                  >
+                    <ClipboardCopy className="w-4 h-4" />
+                    Copy tin nhắn order tổng
+                  </button>
+                )}
+              </div>
+
+              {/* Khung preview tin nhắn order tổng */}
+              {preparationData.includedOrders.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 print:hidden">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    Xem trước nội dung tin nhắn order tổng
+                  </p>
+                  <pre className="text-sm text-slate-700 font-semibold whitespace-pre-wrap leading-relaxed">
+                    {preparationData.includedOrders
+                      .map(order => {
+                        const name = getCleanCustomerName(order);
+                        const items = order.order_items
+                          .filter(item => prepProductFilter === 'all' || (item.products?.name || '') === prepProductFilter)
+                          .map(item => `${item.quantity}${item.products?.unit || 'kg'} ${item.products?.name || 'SP'}`);
+                        if (items.length === 0) return null;
+                        return `${name}: ${items.join(', ')}`;
+                      })
+                      .filter(Boolean)
+                      .join('\n')
+                    }
+                  </pre>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:grid-cols-2 print:gap-3">
                 {preparationData.includedOrders.length === 0 && (
                   <p className="text-gray-500 italic col-span-full">Chưa có đơn hàng nào cần chuẩn bị.</p>
@@ -1549,17 +1685,14 @@ export default function AdminPage() {
                         key={order.id} 
                         className="bg-gradient-to-br from-white to-slate-50/50 border border-slate-200/80 rounded-2xl p-5 shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-md transition-all duration-200 break-inside-avoid flex flex-col gap-4 border-l-4 border-l-orange-500 print:border-slate-300 print:shadow-none"
                       >
-                        {/* Hàng trên: Số thứ tự + Tên khách hàng */}
                         <div className="flex items-center gap-3">
-                          <span className="flex items-center justify-center bg-slate-100 text-slate-700 text-xs font-black rounded-lg w-7 h-7 shrink-0 print:border print:border-slate-300">
+                          <span className="flex items-center justify-center bg-slate-100 text-slate-700 text-xs font-black rounded-lg w-7 h-7 shrink-0">
                             {(index + 1).toString().padStart(2, '0')}
                           </span>
                           <p className="font-black text-2xl text-blue-900 tracking-tight print:text-black line-clamp-1">
                             {cleanName}
                           </p>
                         </div>
-                        
-                        {/* Hàng dưới: Danh sách sản phẩm dạng thẻ nhỏ siêu dễ đọc */}
                         <div className="flex flex-col gap-2 border-t border-slate-100/80 pt-3">
                           {order.order_items.map(item => {
                             const pName = item.products?.name || 'SP'
@@ -1569,9 +1702,7 @@ export default function AdminPage() {
                                 key={item.id} 
                                 className="flex justify-between items-center bg-white border border-slate-100 rounded-xl px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.01)] print:border-slate-300"
                               >
-                                <span className="text-lg font-extrabold text-slate-700 print:text-black">
-                                  {pName}
-                                </span>
+                                <span className="text-lg font-extrabold text-slate-700 print:text-black">{pName}</span>
                                 <span className="text-xl font-black text-orange-600 print:text-black bg-orange-50/50 px-2.5 py-0.5 rounded-lg border border-orange-100/60 shrink-0">
                                   {item.quantity} {item.products?.unit}
                                 </span>
@@ -1583,40 +1714,88 @@ export default function AdminPage() {
                     )
                   }
 
+                  // Chế độ thường - 2 cột rõ ràng trong thẻ
+                  const cleanName = getCleanCustomerName(order);
+                  const phone = order.profiles?.phone || (() => {
+                    const m = (order.note || '').match(/(0[3|5|7|8|9])+([0-9]{8})\b/);
+                    return m ? m[0] : '';
+                  })();
+                  const deliveryType = getDeliveryType(order);
+                  const noteForDisplay = order.note ? order.note
+                    .replace(/Tên:[^\n]*/gi, '')
+                    .replace(/(0[3|5|7|8|9])+([0-9]{8})\b/, '')
+                    .trim() : '';
+
                   return (
-                    <div key={order.id} className="flex flex-col sm:flex-row gap-3 bg-white border border-gray-200 print:border-gray-300 rounded-lg p-3 sm:p-4 shadow-sm print:shadow-none break-inside-avoid">
-                      <div className="sm:w-1/2">
-                        <p className="font-mono text-xs font-bold text-gray-400 print:text-gray-500">
-                          #{(index + 1).toString().padStart(2, '0')} - MÃ: {order.id.slice(0,6).toUpperCase()}
-                          {prepDeliveryFilter === 'all' && ` · ${getDeliveryType(order) === 'company' ? '🏢 Tại công ty' : '🚚 Giao tận nơi'}`}
-                        </p>
-                        {showCustomerNames && (
-                          <p className="font-bold text-gray-800 mt-1 print:text-black">
-                            {order.profiles?.full_name || 'Khách (Xem ghi chú)'}
-                          </p>
-                        )}
-                        <p className="text-[11px] text-gray-500 mt-0.5 print:text-gray-600">
-                          {new Date(order.created_at).toLocaleString('vi-VN')}
-                        </p>
-                        {order.note && showCustomerNames && (
-                          <p className="text-xs text-gray-700 mt-1 italic break-words whitespace-normal print:text-black">
-                            Ghi chú: {order.note}
-                          </p>
-                        )}
+                    <div 
+                      key={order.id}
+                      className="bg-white border border-gray-200 rounded-xl shadow-sm break-inside-avoid overflow-hidden print:border-gray-300 print:shadow-none hover:shadow-md transition-shadow"
+                    >
+                      {/* Header thẻ */}
+                      <div className="flex items-center justify-between bg-slate-50 border-b border-gray-100 px-4 py-2.5">
+                        <span className="font-mono text-xs font-bold text-gray-400">
+                          #{(index + 1).toString().padStart(2, '0')} · {order.id.slice(0,6).toUpperCase()}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          deliveryType === 'company'
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-teal-100 text-teal-700'
+                        }`}>
+                          {deliveryType === 'company' ? '🏢 Tại công ty' : '🚚 Giao tận nơi'}
+                        </span>
                       </div>
-                      <div className="flex-1 border-t sm:border-t-0 sm:border-l border-gray-100 print:border-gray-200 pt-2 sm:pt-0 sm:pl-3">
-                        <ul className="text-sm space-y-1">
-                          {order.order_items.map(item => {
-                            const pName = item.products?.name || 'SP'
-                            if (prepProductFilter !== 'all' && pName !== prepProductFilter) return null
-                            return (
-                              <li key={item.id} className="flex justify-between border-b border-gray-100 print:border-gray-200 last:border-0 pb-1">
-                                <span className="text-gray-700 print:text-black text-xs font-medium">{pName}</span>
-                                <span className="font-bold text-gray-900 print:text-black text-xs">{item.quantity} {item.products?.unit}</span>
-                              </li>
-                            )
-                          })}
-                        </ul>
+
+                      {/* Body 2 cột */}
+                      <div className="grid grid-cols-2 divide-x divide-gray-100">
+                        {/* Cột trái: Thông tin khách */}
+                        <div className="p-4 space-y-2.5">
+                          {showCustomerNames && (
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-blue-500 shrink-0" />
+                              <p className="font-black text-gray-900 text-sm leading-tight">{cleanName}</p>
+                            </div>
+                          )}
+                          {phone && (
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-4 h-4 text-green-500 shrink-0" />
+                              <p className="text-sm text-gray-700 font-semibold">{phone}</p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                            <p className="text-[11px] text-gray-400 font-medium">
+                              {new Date(order.created_at).toLocaleString('vi-VN', {
+                                month: '2-digit', day: '2-digit',
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          {/* Ghi chú đặc biệt */}
+                          {noteForDisplay && showCustomerNames && (
+                            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                              <p className="text-[11px] text-amber-800 font-semibold break-words whitespace-normal leading-relaxed">{noteForDisplay}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Cột phải: Món hàng + SL */}
+                        <div className="p-4">
+                          <ul className="space-y-2">
+                            {order.order_items.map(item => {
+                              const pName = item.products?.name || 'SP'
+                              if (prepProductFilter !== 'all' && pName !== prepProductFilter) return null
+                              return (
+                                <li key={item.id} className="flex items-center justify-between gap-2 border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                                  <span className="font-bold text-gray-800 text-sm print:text-black">{pName}</span>
+                                  <span className="shrink-0 text-sm font-black text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-2 py-0.5 print:text-black print:border-gray-300">
+                                    {item.quantity} {item.products?.unit}
+                                  </span>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   )
