@@ -233,7 +233,7 @@ export default function FeedbackPage() {
       <div className="w-full max-w-2xl mt-6 mb-20 flex flex-col items-center animate-in fade-in duration-500">
         
         {/* Navigation Tabs - Apple Style Glassmorphism */}
-        <div className="w-full bg-white/70 backdrop-blur-md border border-slate-200/80 rounded-2xl p-1.5 sm:p-2 flex gap-1.5 sm:gap-2 mt-4 mb-8 sm:mt-6 sm:mb-10 shadow-sm">
+        <div className="w-full bg-white/70 backdrop-blur-md border border-slate-200/80 rounded-2xl p-1.5 flex gap-1 mb-8 shadow-sm">
           <button
             onClick={() => { setActiveTab('rating'); setSuccess(false); setError(''); }}
             className={`flex-1 py-2.5 sm:py-3 px-1 sm:px-2 rounded-xl text-[10px] sm:text-xs md:text-sm font-black transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
@@ -273,7 +273,7 @@ export default function FeedbackPage() {
 
         {/* Tab 1: Ratings & Feedback */}
         {activeTab === 'rating' && (
-          <div className="w-full bg-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl shadow-lg shadow-slate-100 border border-slate-100">
+          <div className="w-full bg-white rounded-2xl sm:rounded-3xl shadow-lg shadow-slate-100 border border-slate-100 custom-card-feedback">
             {success ? (
               <div className="text-center py-10 animate-in zoom-in duration-300">
                 <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-emerald-100">
@@ -289,24 +289,24 @@ export default function FeedbackPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleRatingSubmit} className="space-y-6">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-extrabold text-slate-900 flex items-center justify-center gap-2 mb-3">
+              <form onSubmit={handleRatingSubmit} style={{ display: 'block' }}>
+                <div className="text-center custom-header-margin">
+                  <h2 className="text-2xl font-extrabold text-slate-900 flex items-center justify-center gap-2">
                     <Sparkles className="w-6 h-6 text-yellow-500" />
                     Đánh Giá Chất Lượng Dịch Vụ
                   </h2>
-                  <p className="text-slate-500 text-sm mt-1 mb-6">Ý kiến của bạn là động lực giúp chúng tôi mang hải sản tươi ngon hơn mỗi ngày.</p>
+                  <p className="text-slate-500 text-sm mt-3 leading-relaxed">Ý kiến của bạn là động lực giúp chúng tôi mang hải sản tươi ngon hơn mỗi ngày.</p>
                 </div>
 
                 {error && (
-                  <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-sm mb-5">
+                  <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-sm custom-form-group">
                     <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                     <p>{error}</p>
                   </div>
                 )}
 
                 {/* Star Picker */}
-                <div className="flex flex-col items-center gap-2.5 py-4 bg-slate-50/50 rounded-2xl border border-slate-100 mb-5">
+                <div className="flex flex-col items-center gap-2.5 py-4 bg-slate-50/50 rounded-2xl border border-slate-100 custom-form-group">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chọn mức độ hài lòng</label>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -330,8 +330,8 @@ export default function FeedbackPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">Tiêu đề đánh giá *</label>
+                <div className="custom-form-group">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Tiêu đề đánh giá *</label>
                   <input
                     required
                     value={title}
@@ -341,8 +341,8 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                <div className="space-y-2 mb-6">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">Chi tiết góp ý *</label>
+                <div className="custom-form-group">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Chi tiết góp ý *</label>
                   <textarea
                     required
                     value={content}
@@ -354,13 +354,15 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold py-3.5 sm:py-4 px-6 rounded-xl shadow-lg shadow-blue-500/15 hover:shadow-xl transition-all flex items-center justify-center gap-2 mt-6"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Gửi đánh giá ngay</span>}
-                </button>
+                <div className="custom-btn-wrapper">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/15 hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Gửi đánh giá ngay</span>}
+                  </button>
+                </div>
               </form>
             )}
           </div>
@@ -368,7 +370,7 @@ export default function FeedbackPage() {
 
         {/* Tab 2: Rare Seafood Pre-Order */}
         {activeTab === 'preorder' && (
-          <div className="w-full bg-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl shadow-lg shadow-slate-100 border border-slate-100">
+          <div className="w-full bg-white rounded-2xl sm:rounded-3xl shadow-lg shadow-slate-100 border border-slate-100 custom-card-feedback">
             {success ? (
               <div className="text-center py-10 animate-in zoom-in duration-300">
                 <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-5 border border-orange-100">
@@ -384,24 +386,24 @@ export default function FeedbackPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handlePreorderSubmit} className="space-y-6">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-extrabold text-slate-900 flex items-center justify-center gap-2 mb-3">
+              <form onSubmit={handlePreorderSubmit} style={{ display: 'block' }}>
+                <div className="text-center custom-header-margin">
+                  <h2 className="text-2xl font-extrabold text-slate-900 flex items-center justify-center gap-2">
                     <Fish className="w-6 h-6 text-orange-500 animate-pulse" />
                     Đặt Trước Hải Sản Tươi Hiếm Theo Mùa
                   </h2>
-                  <p className="text-slate-500 text-sm mt-1 mb-6">Muốn ăn cá thu một nắng nguyên con, cá bớp khủng, ghẹ xanh Phan Thiết xịn lột vỏ... Hãy đặt trước để khi có chuyến tàu cập bến chúng tôi gom đơn giao luôn!</p>
+                  <p className="text-slate-500 text-sm mt-3 leading-relaxed">Muốn ăn cá thu một nắng nguyên con, cá bớp khủng, ghẹ xanh Phan Thiết xịn lột vỏ... Hãy đặt trước để khi có chuyến tàu cập bến chúng tôi gom đơn giao luôn!</p>
                 </div>
 
                 {error && (
-                  <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-sm mb-5">
+                  <div style={{ padding: '1rem' }} className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm custom-form-group">
                     <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                     <p>{error}</p>
                   </div>
                 )}
 
-                <div className="space-y-2 mb-5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">Tên loại cá / hải sản mong muốn *</label>
+                <div className="custom-form-group">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Tên loại cá / hải sản mong muốn *</label>
                   <input
                     required
                     value={preorderName}
@@ -411,9 +413,9 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-5">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">Số lượng ước tính</label>
+                <div className="custom-form-grid">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Số lượng ước tính</label>
                     <input
                       value={preorderQty}
                       onChange={(e) => setPreorderQty(e.target.value)}
@@ -422,8 +424,8 @@ export default function FeedbackPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">Số điện thoại / Zalo liên hệ *</label>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Số điện thoại / Zalo liên hệ *</label>
                     <input
                       required
                       value={preorderContact}
@@ -434,8 +436,8 @@ export default function FeedbackPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-6">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">Yêu cầu đặc biệt (tùy chọn)</label>
+                <div className="custom-form-group">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Yêu cầu đặc biệt (tùy chọn)</label>
                   <textarea
                     value={preorderDesc}
                     onChange={(e) => setPreorderDesc(e.target.value)}
@@ -445,13 +447,15 @@ export default function FeedbackPage() {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-orange-500 hover:bg-orange-400 active:scale-[0.98] text-white font-bold py-3.5 sm:py-4 px-6 rounded-xl shadow-lg shadow-orange-500/15 hover:shadow-xl transition-all flex items-center justify-center gap-2 border border-orange-600/10 mt-6"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Đăng ký đặt trước ngay</span>}
-                </button>
+                <div className="custom-btn-wrapper">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-orange-500 hover:bg-orange-400 active:scale-[0.98] text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-500/15 hover:shadow-xl transition-all flex items-center justify-center gap-2 border border-orange-600/10"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Đăng ký đặt trước ngay</span>}
+                  </button>
+                </div>
               </form>
             )}
           </div>
@@ -462,7 +466,7 @@ export default function FeedbackPage() {
           <div className="w-full bg-white rounded-2xl sm:rounded-3xl shadow-lg shadow-slate-100 border border-slate-150 flex flex-col h-[520px] overflow-hidden">
             
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-4 flex items-center justify-between shrink-0 shadow-md">
+            <div style={{ padding: '1rem 1.5rem' }} className="bg-gradient-to-r from-emerald-600 to-teal-500 flex items-center justify-between shrink-0 shadow-md">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white border border-white/20">
                   💬
@@ -479,13 +483,13 @@ export default function FeedbackPage() {
 
             {/* Content area */}
             {!getChatIdentifier() ? (
-              <div className="flex-1 p-6 flex flex-col items-center justify-center text-center bg-slate-50">
-                <HelpCircle className="w-12 h-12 text-slate-350 mb-3 animate-bounce" />
-                <h4 className="font-bold text-slate-800 text-lg mb-1">Trò chuyện trực tiếp</h4>
-                <p className="text-slate-500 text-xs max-w-sm mb-6 leading-relaxed">Vui lòng cung cấp Tên và SĐT để chúng tôi lưu lại thông tin cuộc trò chuyện để tiện tư vấn nhé!</p>
+              <div style={{ padding: '1.5rem' }} className="flex-1 flex flex-col items-center justify-center text-center bg-slate-50">
+                <HelpCircle style={{ marginBottom: '0.75rem' }} className="w-12 h-12 text-slate-350 animate-bounce" />
+                <h4 style={{ marginBottom: '0.25rem' }} className="font-bold text-slate-800 text-lg">Trò chuyện trực tiếp</h4>
+                <p style={{ marginBottom: '1.5rem' }} className="text-slate-500 text-xs max-w-sm leading-relaxed">Vui lòng cung cấp Tên và SĐT để chúng tôi lưu lại thông tin cuộc trò chuyện để tiện tư vấn nhé!</p>
                 
-                <form onSubmit={handleRegisterChat} className="w-full max-w-xs space-y-4">
-                  <div className="relative">
+                <form onSubmit={handleRegisterChat} style={{ display: 'block' }} className="w-full max-w-xs">
+                  <div className="custom-form-group relative">
                     <input
                       required
                       type="text"
@@ -495,7 +499,7 @@ export default function FeedbackPage() {
                       className="w-full border border-slate-200/80 bg-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                     />
                   </div>
-                  <div className="relative">
+                  <div className="custom-form-group relative">
                     <input
                       required
                       type="tel"
@@ -505,19 +509,21 @@ export default function FeedbackPage() {
                       className="w-full border border-slate-200/80 bg-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                     />
                   </div>
-                  <button
-                    type="submit"
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all shadow-md shadow-emerald-500/10"
-                  >
-                    Bắt đầu Chat
-                  </button>
+                  <div className="custom-form-group">
+                    <button
+                      type="submit"
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all shadow-md shadow-emerald-500/10"
+                    >
+                      Bắt đầu Chat
+                    </button>
+                  </div>
                 </form>
               </div>
             ) : (
               <div className="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden relative">
                 
                 {/* Messages view */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                <div style={{ padding: '1rem' }} className="flex-1 overflow-y-auto">
                   {chatHistory.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
                       <span className="text-4xl mb-2">👋</span>
@@ -528,7 +534,7 @@ export default function FeedbackPage() {
                     chatHistory.map((chat) => {
                       const isReply = (chat.content as string).startsWith('[Reply]')
                       return (
-                        <div key={chat.id} className={`flex flex-col ${isReply ? 'items-start' : 'items-end'}`}>
+                        <div key={chat.id} style={{ marginBottom: '0.875rem' }} className={`flex flex-col ${isReply ? 'items-start' : 'items-end'}`}>
                           <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                             isReply 
                               ? 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm' 
@@ -547,7 +553,7 @@ export default function FeedbackPage() {
                 </div>
 
                 {/* Message input */}
-                <form onSubmit={handleSendChat} className="bg-white border-t border-slate-200/85 p-3 flex gap-2 shrink-0">
+                <form onSubmit={handleSendChat} style={{ padding: '0.75rem' }} className="bg-white border-t border-slate-200/85 flex gap-2 shrink-0">
                   <input
                     required
                     value={chatMessage}

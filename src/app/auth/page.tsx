@@ -120,13 +120,14 @@ export default function AuthPage() {
         </Link>
 
         {/* Glassmorphism Card */}
-        <div className="bg-slate-900/60 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-slate-800 p-5 sm:p-10 shadow-[0_25px_60px_rgba(2,6,23,0.9)] relative overflow-hidden">
+        {/* Glassmorphism Card */}
+        <div className="bg-slate-900/60 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-slate-800 shadow-[0_25px_60px_rgba(2,6,23,0.9)] relative overflow-hidden custom-card-auth">
           
           {/* Subtle top light glow */}
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent pointer-events-none" />
 
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center custom-header-margin">
             <div className="w-16 h-16 bg-cyan-950/60 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)] animate-pulse">
               <Lock className="w-7 h-7 text-cyan-400" />
             </div>
@@ -142,7 +143,7 @@ export default function AuthPage() {
 
           {/* Tab toggle */}
           {!isForgotPassword && (
-            <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-2xl mb-8">
+            <div className="flex p-1 bg-slate-950/60 border border-slate-800 rounded-2xl custom-tabs-margin" style={{ padding: '0.25rem' }}>
               <button
                 type="button"
                 onClick={() => !isLogin && toggleMode()}
@@ -183,11 +184,11 @@ export default function AuthPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} style={{ display: 'block' }}>
 
             {/* Email/Username */}
-            <div className="space-y-2">
-              <label className="block text-xs font-black uppercase tracking-wider text-slate-400">
+            <div className="custom-form-group">
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-400 custom-label-spacing">
                 Tên đăng nhập hoặc Email
               </label>
               <input
@@ -202,8 +203,8 @@ export default function AuthPage() {
 
             {/* Password */}
             {!isForgotPassword && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center justify-between">
+              <div className="custom-form-group animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center justify-between" style={{ marginBottom: '0.625rem' }}>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-400">
                     Mật khẩu
                   </label>
@@ -231,8 +232,8 @@ export default function AuthPage() {
 
             {/* Confirm Password (register only) */}
             {!isLogin && !isForgotPassword && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-400">
+              <div className="custom-form-group animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-400 custom-label-spacing">
                   Xác nhận mật khẩu
                 </label>
                 <input
@@ -248,20 +249,22 @@ export default function AuthPage() {
             )}
 
             {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-14 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 active:scale-[0.98] disabled:from-slate-850 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-black uppercase tracking-widest text-sm rounded-2xl transition-all mt-4 shadow-xl shadow-orange-500/25 hover:shadow-orange-500/40 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Đang xử lý...</span>
-                </>
-              ) : (
-                <span>{isForgotPassword ? 'Gửi liên kết' : isLogin ? 'Đăng nhập ngay' : 'Đăng ký ngay'}</span>
-              )}
-            </button>
+            <div className="custom-btn-wrapper">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-14 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 active:scale-[0.98] disabled:from-slate-850 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-black uppercase tracking-widest text-sm rounded-2xl transition-all shadow-xl shadow-orange-500/25 hover:shadow-orange-500/40 cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Đang xử lý...</span>
+                  </>
+                ) : (
+                  <span>{isForgotPassword ? 'Gửi liên kết' : isLogin ? 'Đăng nhập ngay' : 'Đăng ký ngay'}</span>
+                )}
+              </button>
+            </div>
 
             {isForgotPassword && (
               <div className="text-center mt-6">

@@ -401,8 +401,8 @@ function ProfileContent() {
 
         {/* Tab Content: Profile */}
         {activeTab === 'profile' && (
-          <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 md:p-10 shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-0.5 hover:border-blue-500/10 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col items-center text-center mb-8">
+          <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-0.5 hover:border-blue-500/10 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 duration-500 custom-card-feedback">
+            <div className="flex flex-col items-center text-center custom-header-margin">
               <h2 className="text-xl font-bold text-slate-800 flex items-center justify-center gap-3">
                 Thông tin giao hàng
               </h2>
@@ -410,19 +410,22 @@ function ProfileContent() {
             </div>
 
             {profileMsg.text && (
-              <div className={`mb-8 flex items-start gap-3 p-4 rounded-xl text-sm font-medium border animate-in fade-in duration-300 ${
-                profileMsg.type === 'success' 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                  : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
+              <div 
+                style={{ padding: '1rem' }} 
+                className={`rounded-xl text-sm font-medium border animate-in fade-in duration-300 custom-form-group flex items-start gap-3 ${
+                  profileMsg.type === 'success' 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                    : 'bg-red-50 border-red-200 text-red-700'
+                }`}
+              >
                 {profileMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
                 <p>{profileMsg.text}</p>
               </div>
             )}
 
-            <form onSubmit={handleUpdateProfile} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Họ và tên</label>
+            <form onSubmit={handleUpdateProfile} style={{ display: 'block' }}>
+              <div className="custom-form-group">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Họ và tên</label>
                 <input
                   type="text"
                   value={profile.full_name || ''}
@@ -432,8 +435,8 @@ function ProfileContent() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Số điện thoại</label>
+              <div className="custom-form-group">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Số điện thoại</label>
                 <input
                   type="tel"
                   value={profile.phone || ''}
@@ -443,8 +446,8 @@ function ProfileContent() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Địa chỉ giao hàng</label>
+              <div className="custom-form-group">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block custom-label-spacing">Địa chỉ giao hàng</label>
                 <textarea
                   value={profile.address || ''}
                   onChange={(e) => setProfile({ ...profile, address: e.target.value })}
@@ -454,7 +457,7 @@ function ProfileContent() {
                 />
               </div>
 
-               <div className="pt-4 flex justify-center">
+               <div className="custom-btn-wrapper flex justify-center">
                 <button
                   type="submit"
                   disabled={savingProfile}
@@ -473,7 +476,7 @@ function ProfileContent() {
             {/* Account Security Section */}
             <hr className="my-10 border-slate-100" />
 
-            <div className="flex flex-col items-center text-center mb-8">
+            <div className="flex flex-col items-center text-center custom-header-margin">
               <h2 className="text-xl font-bold text-slate-800 flex items-center justify-center gap-3">
                 Bảo mật tài khoản
               </h2>
@@ -481,21 +484,27 @@ function ProfileContent() {
             </div>
 
             {securityMsg.text && (
-              <div className={`mb-8 flex items-start gap-3 p-4 rounded-xl text-sm font-medium border animate-in fade-in duration-300 ${
-                securityMsg.type === 'success' 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                  : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
+              <div 
+                style={{ padding: '1rem' }} 
+                className={`custom-form-group flex items-start gap-3 rounded-xl text-sm font-medium border animate-in fade-in duration-300 ${
+                  securityMsg.type === 'success' 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                    : 'bg-red-50 border-red-200 text-red-700'
+                }`}
+              >
                 {securityMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
                 <p>{securityMsg.text}</p>
               </div>
             )}
 
-            <div className="space-y-6">
+            <div style={{ display: 'block' }}>
               {/* Liên kết Email */}
-              <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-inner">
-                <h3 className="text-sm font-bold text-slate-800 mb-2">Liên kết Email khôi phục</h3>
-                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              <div 
+                style={{ padding: '1.5rem' }} 
+                className="bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-inner custom-form-group"
+              >
+                <h3 style={{ marginBottom: '0.5rem' }} className="text-sm font-bold text-slate-800">Liên kết Email khôi phục</h3>
+                <p style={{ marginBottom: '1rem' }} className="text-xs text-slate-500 leading-relaxed">
                   Nếu bạn đang đăng nhập bằng Tên đăng nhập, hãy liên kết với một Email thật để khôi phục mật khẩu khi lỡ quên. 
                   <br/>
                   <strong className="text-emerald-600">Đặc quyền: Sau khi liên kết, bạn có thể dùng CẢ Tên đăng nhập gốc hoặc Email mới này để đăng nhập!</strong>
@@ -520,8 +529,11 @@ function ProfileContent() {
               </div>
 
               {/* Đổi mật khẩu */}
-              <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-inner">
-                <h3 className="text-sm font-bold text-slate-800 mb-2">Đổi mật khẩu mới</h3>
+              <div 
+                style={{ padding: '1.5rem' }} 
+                className="bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-inner custom-form-group"
+              >
+                <h3 style={{ marginBottom: '1rem' }} className="text-sm font-bold text-slate-800">Đổi mật khẩu mới</h3>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="password"
