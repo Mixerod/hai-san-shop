@@ -35,7 +35,7 @@ export default function ContactPage() {
           <div className="space-y-6 flex flex-col justify-center">
             
             {/* Phone */}
-            <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-6 rounded-3xl flex gap-5 hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-bottom-6 duration-700">
+            <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-4 sm:p-6 rounded-2xl sm:rounded-3xl flex gap-4 sm:gap-5 hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-bottom-6 duration-700">
               <div className="w-14 h-14 shrink-0 bg-blue-500/10 rounded-2xl flex items-center justify-center border border-blue-500/20 shadow-inner">
                 <Phone className="w-6 h-6 text-blue-400" />
               </div>
@@ -49,7 +49,7 @@ export default function ContactPage() {
             </div>
 
             {/* Address */}
-            <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-6 rounded-3xl flex gap-5 hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
+            <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-4 sm:p-6 rounded-2xl sm:rounded-3xl flex gap-4 sm:gap-5 hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
               <div className="w-14 h-14 shrink-0 bg-orange-500/10 rounded-2xl flex items-center justify-center border border-orange-500/20 shadow-inner">
                 <MapPin className="w-6 h-6 text-orange-400" />
               </div>
@@ -62,7 +62,7 @@ export default function ContactPage() {
             </div>
 
             {/* Bank */}
-            <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-6 rounded-3xl flex gap-5 hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
+            <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-4 sm:p-6 rounded-2xl sm:rounded-3xl flex gap-4 sm:gap-5 hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
               <div className="w-14 h-14 shrink-0 bg-green-500/10 rounded-2xl flex items-center justify-center border border-green-500/20 shadow-inner">
                 <CreditCard className="w-6 h-6 text-green-400" />
               </div>
@@ -79,7 +79,7 @@ export default function ContactPage() {
           </div>
 
           {/* Zalo QR Code Area */}
-          <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-8 rounded-3xl flex flex-col items-center justify-center text-center hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-right-8 duration-700 delay-300 h-full">
+          <div className="bg-gray-900/60 backdrop-blur-xl border border-gray-800/80 p-5 sm:p-8 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center text-center hover:border-gray-700/80 transition-colors animate-in fade-in slide-in-from-right-8 duration-700 delay-300 h-full">
             <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/20 mb-6 shadow-inner">
               <QrCode className="w-8 h-8 text-blue-400" />
             </div>

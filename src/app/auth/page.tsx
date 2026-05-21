@@ -99,7 +99,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="w-full min-h-[92vh] flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-slate-950">
+    <div className="w-full min-h-[92vh] flex flex-col items-center justify-center px-3 sm:px-4 py-10 sm:py-16 relative overflow-hidden bg-slate-950">
       
       {/* Premium Ocean Background Shimmers */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
@@ -120,7 +120,7 @@ export default function AuthPage() {
         </Link>
 
         {/* Glassmorphism Card */}
-        <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl border border-slate-800 p-8 sm:p-10 shadow-[0_25px_60px_rgba(2,6,23,0.9)] relative overflow-hidden">
+        <div className="bg-slate-900/60 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-slate-800 p-5 sm:p-10 shadow-[0_25px_60px_rgba(2,6,23,0.9)] relative overflow-hidden">
           
           {/* Subtle top light glow */}
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent pointer-events-none" />

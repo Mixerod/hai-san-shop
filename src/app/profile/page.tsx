@@ -344,7 +344,7 @@ function ProfileContent() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/15 to-slate-100/50 flex flex-col items-center px-4 sm:px-6 py-12">
+    <div className="w-full min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/15 to-slate-100/50 flex flex-col items-center px-3 sm:px-6 py-8 sm:py-12">
       <div className="w-full max-w-3xl">
         
         {/* Header & Logout */}
@@ -377,7 +377,7 @@ function ProfileContent() {
         <div className="flex p-1.5 bg-slate-100/80 rounded-2xl mb-8 border border-slate-200/50 shadow-inner">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-4 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2.5 py-3 sm:py-4 px-2 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 ${
               activeTab === 'profile' 
                 ? 'bg-white text-blue-600 shadow-md shadow-blue-900/5 border border-slate-200/30' 
                 : 'text-slate-500 hover:text-slate-800 hover:bg-white/40 border border-transparent'
@@ -388,7 +388,7 @@ function ProfileContent() {
           </button>
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-4 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2.5 py-3 sm:py-4 px-2 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 ${
               activeTab === 'orders' 
                 ? 'bg-white text-blue-600 shadow-md shadow-blue-900/5 border border-slate-200/30' 
                 : 'text-slate-500 hover:text-slate-800 hover:bg-white/40 border border-transparent'
@@ -401,7 +401,7 @@ function ProfileContent() {
 
         {/* Tab Content: Profile */}
         {activeTab === 'profile' && (
-          <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-10 shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-0.5 hover:border-blue-500/10 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 md:p-10 shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-0.5 hover:border-blue-500/10 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col items-center text-center mb-8">
               <h2 className="text-xl font-bold text-slate-800 flex items-center justify-center gap-3">
                 Thông tin giao hàng
@@ -493,7 +493,7 @@ function ProfileContent() {
 
             <div className="space-y-6">
               {/* Liên kết Email */}
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
+              <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-inner">
                 <h3 className="text-sm font-bold text-slate-800 mb-2">Liên kết Email khôi phục</h3>
                 <p className="text-xs text-slate-500 mb-4 leading-relaxed">
                   Nếu bạn đang đăng nhập bằng Tên đăng nhập, hãy liên kết với một Email thật để khôi phục mật khẩu khi lỡ quên. 
@@ -520,7 +520,7 @@ function ProfileContent() {
               </div>
 
               {/* Đổi mật khẩu */}
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
+              <div className="bg-slate-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-inner">
                 <h3 className="text-sm font-bold text-slate-800 mb-2">Đổi mật khẩu mới</h3>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <input
@@ -595,7 +595,7 @@ function ProfileContent() {
                   {/* Order Header / Toggle */}
                   <div 
                     onClick={() => toggleOrder(order.id)}
-                    className="p-5 sm:p-6 cursor-pointer hover:bg-slate-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className="p-4 sm:p-6 cursor-pointer hover:bg-slate-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-3">
@@ -702,7 +702,7 @@ function ProfileContent() {
                         </div>
                         <div className="space-y-4">
                           {order.order_items?.map(item => (
-                            <div key={item.id} className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-500/5 transition-all duration-300">
+                            <div key={item.id} className="flex justify-between items-center bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-500/5 transition-all duration-300">
                               <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl bg-blue-50/50 border border-blue-100/50 flex items-center justify-center text-sm font-black text-blue-600">
                                   {item.quantity}

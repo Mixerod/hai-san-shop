@@ -230,7 +230,7 @@ function CheckoutForm() {
   }
 
   return (
-    <div className="w-full flex flex-col items-center px-4 py-12">
+    <div className="w-full flex flex-col items-center px-3 sm:px-4 py-8 sm:py-12">
       <div className="w-full max-w-2xl">
 
         {/* Header */}
@@ -272,7 +272,7 @@ function CheckoutForm() {
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* Order Summary */}
-          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+          <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6">
             <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
               <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
               Đơn hàng của bạn
@@ -282,7 +282,7 @@ function CheckoutForm() {
                 <div key={item.id} className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 ${idx > 0 ? 'pt-4' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-extrabold text-slate-850 text-sm sm:text-base truncate">{item.name}</p>
+                      <p className="font-extrabold text-slate-850 text-sm sm:text-base">{item.name}</p>
                       <button
                         type="button"
                         onClick={() => remove(item.id)}
@@ -339,7 +339,7 @@ function CheckoutForm() {
           </section>
 
           {/* Customer Info */}
-          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+          <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6">
             <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
               <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
               Thông tin liên hệ
@@ -371,7 +371,7 @@ function CheckoutForm() {
           </section>
 
           {/* Delivery Method */}
-          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+          <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6">
             <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
               <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
               Hình thức nhận hàng
@@ -447,7 +447,7 @@ function CheckoutForm() {
                 </div>
                 {totalKg >= 5 && (
                   <div className={`overflow-hidden transition-all duration-300 ${deliveryMethod === 'viettel' ? 'max-h-64 mt-3' : 'max-h-0'}`}>
-                    <div className="ml-7 space-y-3">
+                    <div className="ml-0 sm:ml-7 space-y-3 mt-3 sm:mt-0">
                       <input
                         required={deliveryMethod === 'viettel'}
                         type="text"
@@ -474,7 +474,7 @@ function CheckoutForm() {
           </section>
 
           {/* Payment Method */}
-          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+          <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6">
             <h2 className="text-base font-bold text-slate-800 mb-5 flex items-center gap-2">
               <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
               Phương thức thanh toán
@@ -511,7 +511,7 @@ function CheckoutForm() {
                 </p>
                 <div className="inline-block text-left bg-white rounded-lg p-4 mb-4 border border-slate-200 group-hover:border-blue-300 shadow-sm transition-all active:scale-98">
                   <p className="font-semibold text-base text-green-600">Agribank</p>
-                  <p className="font-mono text-xl tracking-wider text-slate-900 my-1 font-bold">4801205175150</p>
+                  <p className="font-mono text-lg sm:text-xl tracking-wider text-slate-900 my-1 font-bold">4801205175150</p>
                   <p className="text-slate-700 font-semibold">LÊ MINH QUYẾT</p>
                 </div>
                 <div className="bg-blue-50 border border-blue-100 py-2.5 px-4 rounded-lg inline-flex items-center justify-center gap-2 block max-w-xs mx-auto">
@@ -525,7 +525,7 @@ function CheckoutForm() {
           </section>
 
           {/* Notes */}
-          <section className="bg-white border border-slate-200 rounded-2xl p-6">
+          <section className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
               Ghi chú thêm <span className="text-sm text-slate-400 font-normal ml-1">(Tùy chọn)</span>
             </h2>

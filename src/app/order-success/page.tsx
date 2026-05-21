@@ -157,7 +157,7 @@ function OrderSuccessContent() {
   const deliveryStr = deliveryLine ? deliveryLine.replace('Nhận hàng:', '').trim() : 'Chưa rõ'
 
   return (
-    <div className="w-full flex flex-col items-center px-4 py-8">
+    <div className="w-full flex flex-col items-center px-3 sm:px-4 py-6 sm:py-8">
     <div className="w-full max-w-4xl space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
       
       {/* Header Success Wow */}
@@ -175,7 +175,7 @@ function OrderSuccessContent() {
       <div className="grid md:grid-cols-2 gap-8">
         
         {/* Card 1: Order Details */}
-        <section className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl shadow-slate-200/40 flex flex-col">
+        <section className="bg-white border border-gray-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-xl shadow-slate-200/40 flex flex-col">
           <div className="flex justify-between items-start border-b border-gray-100 pb-5 mb-5">
             <div>
               <h2 className="text-xl font-bold text-slate-800">Mã đơn hàng</h2>
@@ -204,7 +204,7 @@ function OrderSuccessContent() {
             ))}
           </div>
 
-          <div className="bg-slate-50 rounded-2xl p-5 border border-gray-100 space-y-3">
+          <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-gray-100 space-y-3">
             <div className="flex justify-between text-sm items-center">
               <span className="text-slate-500 font-medium">Thanh toán:</span>
               <span className="text-slate-700 font-bold bg-white px-3 py-1 rounded-md border border-gray-200 shadow-sm">
@@ -221,7 +221,7 @@ function OrderSuccessContent() {
         </section>
 
         {/* Card 2: Payment & Delivery Guide */}
-        <section className="bg-gradient-to-br from-blue-50 to-indigo-50/30 border border-blue-100 rounded-3xl p-8 shadow-xl shadow-blue-100/40 relative overflow-hidden flex flex-col">
+        <section className="bg-gradient-to-br from-blue-50 to-indigo-50/30 border border-blue-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-xl shadow-blue-100/40 relative overflow-hidden flex flex-col">
           <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
             <Wallet className="w-40 h-40" />
           </div>
@@ -235,12 +235,12 @@ function OrderSuccessContent() {
             {order.payment_method === 'transfer' ? (
               <>
                 <p className="text-slate-600 font-medium">Chuyển khoản vào tài khoản dưới đây để chúng tôi xử lý đơn ngay:</p>
-                <div className="bg-white border border-blue-200 rounded-2xl p-5 shadow-sm hover:border-blue-300 transition-colors">
+                <div className="bg-white border border-blue-200 rounded-2xl p-4 sm:p-5 shadow-sm hover:border-blue-300 transition-colors">
                   <div className="flex justify-between items-center mb-1">
                     <p className="font-bold text-blue-600">Ngân hàng Agribank</p>
                   </div>
                   <div className="flex items-center justify-between gap-4 mb-2">
-                    <p className="font-mono text-3xl font-black tracking-wider text-slate-800">4801205175150</p>
+                    <p className="font-mono text-xl sm:text-2xl md:text-3xl font-black tracking-wider text-slate-800">4801205175150</p>
                     <button 
                       onClick={copyToClipboard}
                       className="p-2.5 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-xl transition-all border border-gray-100 active:scale-95"
