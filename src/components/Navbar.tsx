@@ -275,6 +275,12 @@ export default function Navbar() {
           animation: sweep-logo 7s infinite linear;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
+          display: inline-block;
+          line-height: 1.65 !important;
+          padding-top: 0.35em !important;
+          padding-bottom: 0.25em !important;
+          margin-top: -0.35em !important;
+          margin-bottom: -0.25em !important;
         }
         @keyframes pulse-glow-cart {
           0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
@@ -311,9 +317,9 @@ export default function Navbar() {
           -webkit-text-fill-color: transparent;
           display: inline-flex;
           align-items: center;
-          line-height: 1.4;
-          padding: 0.25em 0;
-          margin: -0.25em 0;
+          line-height: 1.5 !important;
+          padding-top: 0.22em !important;
+          padding-bottom: 0.16em !important;
         }
         @keyframes gold-border-sparkle {
           0%, 100% { border-color: rgba(245, 158, 11, 0.25); box-shadow: 0 0 6px rgba(245, 158, 11, 0.05); }
@@ -347,16 +353,16 @@ export default function Navbar() {
         }
       `}} />
 
-      <div className="max-w-7xl mx-auto w-full flex justify-between items-center px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto w-full flex justify-between items-center px-2.5 min-[380px]:px-4 sm:px-6 lg:px-8">
           
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 group shrink-0">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-800 to-cyan-500 flex items-center justify-center border border-cyan-400/30 group-hover:border-cyan-300 shadow-md group-hover:scale-105 transition-all duration-300">
-              <Anchor className="w-6 h-6 text-white group-hover:rotate-12 transition-transform duration-300" />
+          <Link href="/" className="flex items-center gap-1 min-[360px]:gap-1.5 min-[380px]:gap-3 group shrink-0">
+            <div className="w-7.5 h-7.5 min-[360px]:w-8 min-[360px]:h-8 min-[380px]:w-9 min-[380px]:h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-blue-800 to-cyan-500 flex items-center justify-center border border-cyan-400/30 group-hover:border-cyan-300 shadow-md group-hover:scale-105 transition-all duration-300 shrink-0">
+              <Anchor className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 min-[380px]:w-5 min-[380px]:h-5 sm:w-6 sm:h-6 text-white group-hover:rotate-12 transition-transform duration-300" />
             </div>
-            <div className="flex flex-col text-left justify-center py-0.5 select-none">
-              <span className="font-black text-xl tracking-wider uppercase shimmer-logo-text leading-[1.2] pb-0.5 whitespace-nowrap">Hải Sản Sạch</span>
-              <span className="text-[10px] text-cyan-400 font-semibold tracking-wide uppercase leading-none whitespace-nowrap">Phan Thiết Port</span>
+            <div className="flex flex-col text-left justify-center py-0.5 select-none min-w-0">
+              <span className="font-black text-xs min-[360px]:text-sm min-[380px]:text-base sm:text-xl tracking-wider uppercase shimmer-logo-text whitespace-nowrap">Hải Sản Sạch</span>
+              <span className="text-[7px] min-[380px]:text-[8px] sm:text-[10px] text-cyan-400 font-semibold tracking-wide uppercase leading-none whitespace-nowrap hidden min-[360px]:block">Phan Thiết Port</span>
             </div>
           </Link>
 
@@ -403,13 +409,16 @@ export default function Navbar() {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-0.5 min-[340px]:gap-1 min-[380px]:gap-1.5 sm:gap-4 shrink-0">
             
-            {/* Mobile "Săn hải sản" Button (Extremely neat and compact) */}
+            {/* Mobile "Săn hải sản" Button (Extremely neat and compact with premium breathing room) */}
             <Link
               href="/feedback"
-              style={{ padding: '8px 16px' }}
-              className={`md:hidden flex items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 border sparkle-gold-btn ${
+              style={{ padding: '8px 20px' }}
+              className={`md:hidden shrink-0 flex items-center justify-center rounded-xl font-black uppercase tracking-wider transition-all duration-300 border sparkle-gold-btn 
+                text-[9px] 
+                min-[360px]:text-[10px] 
+                min-[380px]:text-[11px] ${
                 isActive('/feedback')
                   ? 'bg-amber-950/60 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.25)] text-amber-350'
                   : 'bg-amber-950/15 border-amber-500/30 text-amber-400 hover:bg-amber-950/30'
@@ -419,19 +428,23 @@ export default function Navbar() {
             </Link>
             
             {/* Notification Bell (Visible on all devices) */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 onClick={handleToggleNotifications}
-                className={`p-2 sm:p-3 rounded-xl transition-all duration-300 relative border cursor-pointer ${
+                className={`rounded-xl transition-all duration-300 relative border cursor-pointer shrink-0 
+                  p-1 
+                  min-[360px]:p-1.5 
+                  min-[380px]:p-2 
+                  sm:p-3 ${
                   showNotifications
                     ? 'bg-blue-950/60 border-blue-500/50 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
                     : 'text-slate-300 hover:bg-white/5 border border-white/5 hover:text-white hover:border-white/10'
                 }`}
                 title="Thông báo"
               >
-                <Bell className="w-5.5 h-5.5" />
+                <Bell className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 min-[380px]:w-5 min-[380px]:h-5 sm:w-5.5 sm:h-5.5" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border border-slate-900 animate-pulse shadow-lg shadow-red-500/30">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] min-[380px]:text-[9px] font-black w-3.5 h-3.5 min-[380px]:w-4.5 min-[380px]:h-4.5 rounded-full flex items-center justify-center border border-slate-900 animate-pulse shadow-lg shadow-red-500/30">
                     {unreadCount}
                   </span>
                 )}
@@ -485,7 +498,7 @@ export default function Navbar() {
 
                       if (filtered.length === 0) {
                         return (
-                          <div className="py-8 text-center text-slate-500 text-[11px] font-semibold leading-relaxed">
+                           <div className="py-8 text-center text-slate-500 text-[11px] font-semibold leading-relaxed">
                             <span className="text-xl block mb-1">🔔</span>
                             {activeTab === 'new' 
                               ? 'Không có thông báo mới nào.' 
@@ -513,7 +526,7 @@ export default function Navbar() {
                               <div className="space-y-0.5 min-w-0">
                                 <p className={`text-[11px] leading-relaxed whitespace-pre-wrap break-words ${
                                   isRead ? 'text-slate-400' : 'text-slate-100 font-semibold'
-                                }`}>
+                                }}`}>
                                   {n.message}
                                 </p>
                                 <p className="text-[8px] text-slate-500 font-bold uppercase flex items-center gap-1.5">
@@ -547,15 +560,19 @@ export default function Navbar() {
             {/* Cart with Premium Glowing indicator (Always visible on Mobile & Desktop) */}
             <button 
               onClick={() => setIsOpen(true)}
-              className={`relative p-2 sm:p-3 rounded-xl transition-all duration-300 cursor-pointer ${
+              className={`relative rounded-xl transition-all duration-300 cursor-pointer shrink-0 
+                p-1 
+                min-[360px]:p-1.5 
+                min-[380px]:p-2 
+                sm:p-3 ${
                 isOpen 
                   ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25 border border-orange-400/50' 
                   : 'text-slate-300 hover:bg-white/5 border border-white/5 hover:text-white'
               }`}
             >
-              <ShoppingCart className="w-5.5 h-5.5 transition-transform group-hover:scale-110" />
+              <ShoppingCart className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 min-[380px]:w-5 min-[380px]:h-5 sm:w-5.5 sm:h-5.5 transition-transform group-hover:scale-110" />
               {hasHydrated && cartItemsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-md animate-pulse-glow-cart">
+                <span className="absolute -top-1 -right-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-[8px] min-[380px]:text-[10px] font-black w-4.5 h-4.5 min-[380px]:w-5 min-[380px]:h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-md animate-pulse-glow-cart">
                   {cartItemsCount}
                 </span>
               )}
@@ -604,24 +621,31 @@ export default function Navbar() {
             </div>
 
             {/* Mobile Auth/Profile Button */}
-            <div className="flex md:hidden items-center">
+            <div className="flex md:hidden items-center shrink-0">
               {hasHydrated && (
                 session ? (
                   <Link
                     href="/profile"
-                    className="relative p-1.5 sm:p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40 flex items-center justify-center text-lg hover:bg-cyan-900/60 transition-all shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+                    className="relative rounded-xl bg-cyan-950/40 border border-cyan-500/40 flex items-center justify-center transition-all shadow-[0_0_10px_rgba(6,182,212,0.2)] shrink-0 
+                      p-0.5 text-xs 
+                      min-[360px]:p-1 min-[360px]:text-sm 
+                      min-[380px]:p-1.5 min-[380px]:text-lg hover:bg-cyan-900/60"
                     title="Hồ sơ cá nhân"
                   >
                     🦀
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 min-[380px]:w-2 min-[380px]:h-2 rounded-full bg-emerald-500 border border-slate-900" />
                   </Link>
                 ) : (
                   <Link
                     href="/auth"
-                    className="flex items-center justify-center p-2 sm:p-2.5 rounded-xl bg-gradient-to-tr from-orange-500 to-orange-400 border border-orange-300/30 text-white shadow-lg shadow-orange-500/20"
+                    className="flex items-center justify-center rounded-xl bg-gradient-to-tr from-orange-500 to-orange-400 border border-orange-300/30 text-white shadow-lg shadow-orange-500/20 shrink-0 
+                      p-1 
+                      min-[360px]:p-1.5 
+                      min-[380px]:p-2 
+                      sm:p-2.5"
                     title="Đăng nhập"
                   >
-                    <LogIn className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                    <LogIn className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 min-[380px]:w-5 min-[380px]:h-5 sm:w-5.5 sm:h-5.5" />
                   </Link>
                 )
               )}
@@ -630,9 +654,17 @@ export default function Navbar() {
             {/* Mobile Hamburger Menu Button */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 sm:p-3 text-slate-300 hover:text-white hover:bg-white/5 border border-white/5 rounded-xl transition-colors cursor-pointer"
+              className="md:hidden text-slate-300 hover:text-white hover:bg-white/5 border border-white/5 rounded-xl transition-colors cursor-pointer shrink-0 
+                p-1 
+                min-[360px]:p-1.5 
+                min-[380px]:p-2 
+                sm:p-3"
             >
-              {mobileMenuOpen ? <X className="w-5.5 h-5.5 sm:w-6 sm:h-6" /> : <Menu className="w-5.5 h-5.5 sm:w-6 sm:h-6" />}
+              {mobileMenuOpen ? (
+                <X className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 min-[380px]:w-5.5 min-[380px]:h-5.5 sm:w-6 sm:h-6" />
+              ) : (
+                <Menu className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 min-[380px]:w-5.5 min-[380px]:h-5.5 sm:w-6 sm:h-6" />
+              )}
             </button>
           </div>
       </div>
