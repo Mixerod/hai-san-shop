@@ -560,13 +560,23 @@ export default function AdminPage() {
 
   async function handleToggleProductStock(productId: string, newValue: boolean) {
     try {
-      const { error } = await supabase.from('products').update({ in_stock: newValue }).eq('id', productId);
+      const { data, error } = await supabase
+        .from('products')
+        .update({ in_stock: newValue })
+        .eq('id', productId)
+        .select();
+
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error('row-level security policy block');
+      }
+
       setProductsList(prev => prev.map(p => p.id === productId ? { ...p, in_stock: newValue } : p));
       showToast(newValue ? 'Đã đánh dấu còn hàng' : 'Đã đánh dấu hết hàng');
     } catch (err: any) {
       const msg = (err?.message || '').toLowerCase();
-      if (msg.includes('row-level security') || msg.includes('policy')) {
+      if (msg.includes('row-level security') || msg.includes('policy') || msg.includes('block')) {
         showAdminAlert(
           'RLS chặn cập nhật',
           '💡 Cần thêm policy UPDATE cho bảng products. Chạy trong Supabase SQL Editor:\n\nCREATE POLICY "Allow public update products" ON public.products FOR UPDATE USING (true) WITH CHECK (true);'
@@ -990,12 +1000,21 @@ export default function AdminPage() {
     setUpdatingBulk(true);
     try {
       const idsArray = Array.from(selectedOrderIds);
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("orders")
         .update({ status: bulkStatus })
-        .in("id", idsArray);
+        .in("id", idsArray)
+        .select();
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        showAdminAlert(
+          "Không thể cập nhật trạng thái hàng loạt",
+          "💡 Chào Quyết! Cập nhật không thành công do chính sách bảo mật (RLS) trên bảng \"orders\" của bạn đang chặn quyền chỉnh sửa (UPDATE).\n\nVui lòng mở Supabase Dashboard → SQL Editor và chạy dòng lệnh sau để mở quyền:\n\nCREATE POLICY \"Allow public update orders\" ON public.orders FOR UPDATE USING (true) WITH CHECK (true);"
+        );
+        return;
+      }
 
       setOrders(
         orders.map((o) =>
@@ -1058,16 +1077,25 @@ export default function AdminPage() {
     };
   }, [filteredOrders]);
 
-  // Cập nhật trạng thái
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     setUpdatingId(orderId);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("orders")
         .update({ status: newStatus })
-        .eq("id", orderId);
+        .eq("id", orderId)
+        .select();
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        showAdminAlert(
+          "Không thể cập nhật trạng thái đơn hàng",
+          "💡 Chào Quyết! Cập nhật không thành công do chính sách bảo mật (RLS) trên bảng \"orders\" của bạn đang chặn quyền chỉnh sửa (UPDATE).\n\nVui lòng mở Supabase Dashboard → SQL Editor và chạy dòng lệnh sau để mở quyền:\n\nCREATE POLICY \"Allow public update orders\" ON public.orders FOR UPDATE USING (true) WITH CHECK (true);"
+        );
+        return;
+      }
+
       setOrders(
         orders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
       );

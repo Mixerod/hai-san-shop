@@ -301,18 +301,28 @@ function ProfileContent() {
     if (!window.confirm('Bạn xác nhận đã nhận được đầy đủ hàng và hài lòng với chất lượng chứ?')) return
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .update({ status: 'done' })
         .eq('id', orderId)
+        .select()
 
       if (error) throw error
+
+      if (!data || data.length === 0) {
+        throw new Error('row-level security policy block')
+      }
       
       // Update local state
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'done' } : o))
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error confirming order:', error)
-      alert('Không thể cập nhật trạng thái đơn hàng.')
+      const msg = (error?.message || '').toLowerCase()
+      if (msg.includes('row-level security') || msg.includes('policy') || msg.includes('block')) {
+        alert('💡 Cập nhật không thành công do chính sách bảo mật (RLS) trên bảng "orders" của bạn đang chặn quyền chỉnh sửa.\n\nVui lòng báo Admin hệ thống mở thêm quyền UPDATE cho bảng orders!')
+      } else {
+        alert('Không thể cập nhật trạng thái đơn hàng.')
+      }
     }
   }
 
