@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/store/cart'
 import { supabase } from '@/lib/supabase'
-import { ShoppingCart, Anchor, User, LogOut, LogIn, Menu, X, Bell, Trash2, Zap, ArrowRight, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Anchor, User, LogOut, LogIn, Menu, X, Bell, Trash2, Zap, ArrowRight, Plus, Minus, HelpCircle } from 'lucide-react'
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -230,7 +230,7 @@ export default function Navbar() {
     { name: 'Trang chủ', href: '/' },
     { name: 'Sản phẩm', href: '/products' },
     { name: 'Đơn hàng', href: '/profile?tab=orders' },
-    { name: 'Săn hải sản', href: '/feedback' },
+    { name: 'Săn hải sản', href: '/feedback?tab=preorder' },
   ];
 
   // Logic tàng hình: Chỉ hiện nút Quản trị nếu đúng Email admin
@@ -240,7 +240,8 @@ export default function Navbar() {
     ? [...baseNavLinks, { name: 'Quản trị (Admin)', href: '/admin' }]
     : baseNavLinks
 
-  const isActive = (path: string) => pathname === path
+  // So sánh bỏ query string để các link có ?tab=xxx vẫn được tô active đúng
+  const isActive = (path: string) => pathname === path.split('?')[0]
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -373,7 +374,7 @@ export default function Navbar() {
               
               // Custom highlighting classes for specific tabs
               let customClasses = ''
-              if (link.href === '/feedback') {
+              if (link.href.startsWith('/feedback')) {
                 customClasses = isLinkActive 
                   ? 'bg-amber-950/50 sparkle-gold-btn border border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.35)] font-black' 
                   : 'bg-amber-950/15 sparkle-gold-btn border border-amber-500/25 hover:bg-amber-950/30 hover:border-amber-500/50 font-black'
@@ -396,7 +397,7 @@ export default function Navbar() {
                   style={{ padding: '12px 26px' }}
                   className={`rounded-full text-xs font-bold tracking-wide uppercase leading-none transition-all duration-300 ${customClasses}`}
                 >
-                  {link.href === '/feedback' ? (
+                  {link.href.startsWith('/feedback') ? (
                     <span className="text-gold-gradient">{link.name}</span>
                   ) : link.href === '/products' ? (
                     <span className="text-cyan-gradient">{link.name}</span>
@@ -413,13 +414,13 @@ export default function Navbar() {
             
             {/* Mobile "Săn hải sản" Button (Extremely neat and compact with premium breathing room) */}
             <Link
-              href="/feedback"
+              href="/feedback?tab=preorder"
               style={{ padding: '8px 20px' }}
-              className={`md:hidden shrink-0 flex items-center justify-center rounded-xl font-black uppercase tracking-wider transition-all duration-300 border sparkle-gold-btn 
-                text-[9px] 
-                min-[360px]:text-[10px] 
+              className={`md:hidden shrink-0 flex items-center justify-center rounded-xl font-black uppercase tracking-wider transition-all duration-300 border sparkle-gold-btn
+                text-[9px]
+                min-[360px]:text-[10px]
                 min-[380px]:text-[11px] ${
-                isActive('/feedback')
+                pathname.startsWith('/feedback')
                   ? 'bg-amber-950/60 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.25)] text-amber-350'
                   : 'bg-amber-950/15 border-amber-500/30 text-amber-400 hover:bg-amber-950/30'
               }`}
@@ -427,6 +428,23 @@ export default function Navbar() {
               <span className="text-gold-gradient whitespace-nowrap">Săn hải sản</span>
             </Link>
             
+            {/* FAQ / Help icon — accessible từ mọi page, không chiếm chỗ trong main nav */}
+            <Link
+              href="/faq"
+              title="Câu hỏi thường gặp · Chính sách giao hàng"
+              className={`relative rounded-xl transition-all duration-300 cursor-pointer shrink-0 inline-flex items-center justify-center border
+                p-1
+                min-[360px]:p-1.5
+                min-[380px]:p-2
+                sm:p-3 ${
+                isActive('/faq')
+                  ? 'bg-cyan-950/60 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
+                  : 'text-slate-300 hover:bg-white/5 border-white/5 hover:text-white hover:border-white/10'
+              }`}
+            >
+              <HelpCircle className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4 min-[380px]:w-5 min-[380px]:h-5 sm:w-5.5 sm:h-5.5" />
+            </Link>
+
             {/* Notification Bell (Visible on all devices) */}
             <div className="relative shrink-0">
               <button
@@ -704,6 +722,20 @@ export default function Navbar() {
                 </Link>
               )
             })}
+
+            {/* Hỏi đáp / FAQ entry trong mobile menu — tách riêng với icon */}
+            <Link
+              href="/faq"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-2.5 px-5 py-3.5 rounded-xl text-sm font-black tracking-wide uppercase transition-all duration-200 border ${
+                isActive('/faq')
+                  ? 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
+                  : 'text-slate-300 border-transparent hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <HelpCircle className="w-4 h-4 shrink-0" />
+              <span>Hỏi đáp · Chính sách giao hàng</span>
+            </Link>
           </div>
         </div>
       )}

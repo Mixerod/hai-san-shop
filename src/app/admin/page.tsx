@@ -597,20 +597,88 @@ export default function AdminPage() {
 
     setSendingReply(true);
     try {
+      // Lưu identifier vào title, message vào content; admin trả lời tự động đánh dấu đã đọc
       const { error } = await supabase
         .from('feedbacks')
         .insert({
-          content: `[Reply] ${selectedChatUser}\n${replyMessage.trim()}`,
-          rating: 5
+          title: `[Reply] ${selectedChatUser}`,
+          content: replyMessage.trim(),
+          is_read: true,
         });
 
       if (error) throw error;
       setReplyMessage("");
       fetchFeedbacks();
     } catch (err: any) {
-      showAdminAlert("Lỗi gửi phản hồi", err.message);
+      const msg = (err?.message || '').toLowerCase();
+      if (msg.includes('column') || msg.includes('schema cache') || msg.includes('is_read') || msg.includes('title')) {
+        showAdminAlert(
+          'Bảng feedbacks thiếu cột',
+          '💡 Vui lòng mở Supabase Dashboard → SQL Editor và chạy:\n\nALTER TABLE public.feedbacks ADD COLUMN IF NOT EXISTS title text;\nALTER TABLE public.feedbacks ADD COLUMN IF NOT EXISTS rating integer;\nALTER TABLE public.feedbacks ADD COLUMN IF NOT EXISTS is_read boolean DEFAULT false;\n\nCREATE POLICY "Allow public update feedbacks" ON public.feedbacks FOR UPDATE USING (true) WITH CHECK (true);\nCREATE POLICY "Allow public delete feedbacks" ON public.feedbacks FOR DELETE USING (true);'
+        );
+      } else {
+        showAdminAlert("Lỗi gửi phản hồi", err.message);
+      }
     } finally {
       setSendingReply(false);
+    }
+  }
+
+  // Đánh dấu tất cả tin nhắn của 1 khách thành "đã đọc"
+  async function markChatAsRead(user: string) {
+    try {
+      const { error } = await supabase
+        .from('feedbacks')
+        .update({ is_read: true })
+        .eq('title', `[Chat] ${user}`)
+        .eq('is_read', false);
+      if (error) throw error;
+      // Cập nhật local state để UI phản hồi ngay
+      setFeedbacks(prev => prev.map(f =>
+        f.title === `[Chat] ${user}` && !f.is_read ? { ...f, is_read: true } : f
+      ));
+    } catch (err: any) {
+      const msg = (err?.message || '').toLowerCase();
+      if (msg.includes('column') || msg.includes('is_read')) {
+        showAdminAlert(
+          'Thiếu cột is_read',
+          '💡 Chạy trong Supabase SQL Editor:\n\nALTER TABLE public.feedbacks ADD COLUMN IF NOT EXISTS is_read boolean DEFAULT false;'
+        );
+      }
+      console.error('markChatAsRead error:', err);
+    }
+  }
+
+  // Đánh dấu lại "chưa đọc" (toggle ngược)
+  async function markChatAsUnread(user: string) {
+    try {
+      const { error } = await supabase
+        .from('feedbacks')
+        .update({ is_read: false })
+        .eq('title', `[Chat] ${user}`);
+      if (error) throw error;
+      setFeedbacks(prev => prev.map(f =>
+        f.title === `[Chat] ${user}` ? { ...f, is_read: false } : f
+      ));
+      showToast('Đã đánh dấu chưa đọc');
+    } catch (err: any) {
+      console.error('markChatAsUnread error:', err);
+    }
+  }
+
+  // Xoá toàn bộ tin nhắn của 1 cuộc trò chuyện (cả [Chat] và [Reply])
+  async function deleteChatSession(user: string) {
+    try {
+      const { error } = await supabase
+        .from('feedbacks')
+        .delete()
+        .or(`title.eq.[Chat] ${user},title.eq.[Reply] ${user}`);
+      if (error) throw error;
+      showToast('Đã xoá cuộc trò chuyện');
+      if (selectedChatUser === user) setSelectedChatUser(null);
+      fetchFeedbacks();
+    } catch (err: any) {
+      showAdminAlert('Lỗi xoá cuộc trò chuyện', err.message);
     }
   }
 
@@ -2660,8 +2728,19 @@ export default function AdminPage() {
           const chatSessions = Object.entries(chatSessionsMap).map(([user, msgs]) => {
             const sorted = [...msgs].sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             const latest = sorted[sorted.length - 1];
-            return { user, messages: sorted, latestTime: latest.created_at, latestContent: latest.content };
-          }).sort((a,b) => new Date(b.latestTime).getTime() - new Date(a.latestTime).getTime());
+            // Đếm tin chưa đọc (chỉ tính tin từ khách [Chat], không tính reply của admin)
+            const unreadCount = msgs.filter(m =>
+              m.title?.startsWith('[Chat] ') && m.is_read === false
+            ).length;
+            return { user, messages: sorted, latestTime: latest.created_at, latestContent: latest.content, unreadCount };
+          }).sort((a,b) => {
+            // Ưu tiên session có tin chưa đọc lên đầu, sau đó theo thời gian mới nhất
+            if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+            if (b.unreadCount > 0 && a.unreadCount === 0) return 1;
+            return new Date(b.latestTime).getTime() - new Date(a.latestTime).getTime();
+          });
+
+          const totalUnreadChats = chatSessions.reduce((sum, s) => sum + s.unreadCount, 0);
 
           return (
             <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200 flex flex-col gap-6 text-gray-100">
@@ -2797,47 +2876,104 @@ export default function AdminPage() {
                   <h3 className="font-extrabold text-gray-300 flex items-center gap-2 text-xs sm:text-sm uppercase tracking-wider pb-2 border-b border-gray-700">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                     Chat Trực Tuyến
+                    {totalUnreadChats > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-auto">
+                        {totalUnreadChats} chưa đọc
+                      </span>
+                    )}
                   </h3>
-                  
+
                   <div className="flex-grow flex flex-col gap-3 min-h-0">
                     {/* Chat rooms list */}
                     <div className="overflow-y-auto space-y-1.5 shrink-0 max-h-[140px] pr-1">
                       {chatSessions.length === 0 ? (
                         <p className="text-gray-400 italic text-xs py-4 text-center">Chưa có ai bắt đầu chat.</p>
                       ) : (
-                        chatSessions.map(sess => (
-                          <button
-                            key={sess.user}
-                            type="button"
-                            onClick={() => {
-                              setSelectedChatUser(sess.user);
-                              setReplyMessage("");
-                            }}
-                            className={`w-full text-left p-2.5 rounded-lg border transition-all cursor-pointer ${
-                              selectedChatUser === sess.user
-                                ? 'bg-emerald-50 border-emerald-350 text-emerald-950 font-bold shadow-2xs'
-                                : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'
-                            }`}
-                          >
-                            <p className="text-xs font-black truncate">{sess.user}</p>
-                            <p className="text-[10px] text-gray-450 truncate mt-0.5 font-semibold">{sess.latestContent}</p>
-                          </button>
-                        ))
+                        chatSessions.map(sess => {
+                          const isActive = selectedChatUser === sess.user;
+                          const hasUnread = sess.unreadCount > 0;
+                          return (
+                            <button
+                              key={sess.user}
+                              type="button"
+                              onClick={() => {
+                                setSelectedChatUser(sess.user);
+                                setReplyMessage("");
+                                // Tự động mark đã đọc khi admin mở chat
+                                if (hasUnread) markChatAsRead(sess.user);
+                              }}
+                              className={`w-full text-left p-2.5 rounded-lg border transition-all cursor-pointer relative ${
+                                isActive
+                                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200 font-bold'
+                                  : hasUnread
+                                    ? 'bg-blue-500/5 border-blue-500/30 hover:bg-blue-500/10 text-gray-200'
+                                    : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-black truncate flex-1">{sess.user}</p>
+                                {hasUnread && (
+                                  <span className="bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shrink-0 animate-pulse">
+                                    {sess.unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-[10px] truncate mt-0.5 font-semibold ${hasUnread ? 'text-gray-300' : 'text-gray-500'}`}>
+                                {sess.latestContent}
+                              </p>
+                            </button>
+                          );
+                        })
                       )}
                     </div>
 
                     {/* Active chat window */}
                     {selectedChatUser ? (
-                      <div className="border border-gray-200 rounded-xl overflow-hidden flex flex-col flex-grow bg-white min-h-[220px]">
+                      <div className="border border-gray-700 rounded-xl overflow-hidden flex flex-col flex-grow bg-gray-900 min-h-[220px]">
                         {/* Header */}
-                        <div className="bg-emerald-600 text-white px-3 py-2 flex justify-between items-center shrink-0 shadow-2xs select-none">
-                          <span className="text-[10px] sm:text-xs font-black truncate max-w-[80%]">{selectedChatUser}</span>
-                          <button 
-                            onClick={() => setSelectedChatUser(null)}
-                            className="text-[10px] hover:underline font-extrabold cursor-pointer h-7 flex items-center px-2"
-                          >
-                            Đóng
-                          </button>
+                        <div className="bg-emerald-600 text-white px-3 py-2 flex justify-between items-center shrink-0 shadow-2xs select-none gap-2">
+                          <span className="text-[10px] sm:text-xs font-black truncate flex-1">{selectedChatUser}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => markChatAsUnread(selectedChatUser)}
+                              title="Đánh dấu chưa đọc"
+                              className="text-[10px] font-bold cursor-pointer h-7 px-2 bg-white/10 hover:bg-white/20 rounded transition-all"
+                            >
+                              Chưa đọc
+                            </button>
+                            {confirmDeleteFeedbackId === `chat-${selectedChatUser}` ? (
+                              <div className="flex items-center gap-0.5 bg-white/20 rounded p-0.5">
+                                <button
+                                  onClick={() => { deleteChatSession(selectedChatUser); setConfirmDeleteFeedbackId(null); }}
+                                  title="Xác nhận xoá cuộc trò chuyện"
+                                  className="w-6 h-6 bg-red-600 text-white rounded flex items-center justify-center hover:bg-red-700"
+                                >
+                                  <Check className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteFeedbackId(null)}
+                                  className="w-6 h-6 bg-white/30 text-white rounded flex items-center justify-center hover:bg-white/40"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteFeedbackId(`chat-${selectedChatUser}`)}
+                                title="Xoá cuộc trò chuyện"
+                                className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-red-600 rounded transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedChatUser(null)}
+                              title="Đóng"
+                              className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded transition-all"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
                         {/* Message list */}
@@ -2845,16 +2981,40 @@ export default function AdminPage() {
                           {chatSessions.find(s => s.user === selectedChatUser)?.messages.map(m => {
                             const isReply = m.title?.startsWith('[Reply]');
                             return (
-                              <div key={m.id} className={`flex flex-col ${isReply ? 'items-end' : 'items-start'}`}>
-                                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
-                                  isReply 
-                                    ? 'bg-emerald-600 text-white rounded-tr-none font-medium' 
-                                    : 'bg-gray-100 text-gray-800 rounded-tl-none font-semibold border border-gray-150/60'
-                                }`}>
-                                  {m.content}
+                              <div key={m.id} className={`flex flex-col ${isReply ? 'items-end' : 'items-start'} group/msg`}>
+                                <div className="flex items-end gap-1.5 max-w-[90%]">
+                                  {/* Delete button per message — hover only */}
+                                  {!isReply && (
+                                    <button
+                                      onClick={() => handleDeleteFeedback(m.id)}
+                                      title="Xoá tin nhắn này"
+                                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded cursor-pointer shrink-0"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  <div className={`rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                                    isReply
+                                      ? 'bg-emerald-600 text-white rounded-tr-none font-medium'
+                                      : 'bg-gray-800 text-gray-200 rounded-tl-none font-medium border border-gray-700'
+                                  }`}>
+                                    {m.content}
+                                  </div>
+                                  {isReply && (
+                                    <button
+                                      onClick={() => handleDeleteFeedback(m.id)}
+                                      title="Xoá tin nhắn này"
+                                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded cursor-pointer shrink-0"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
                                 </div>
-                                <span className="text-[8px] text-gray-400 font-semibold mt-0.5">
+                                <span className="text-[8px] text-gray-500 font-semibold mt-0.5 flex items-center gap-1">
                                   {new Date(m.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                  {!isReply && m.is_read === false && (
+                                    <span className="text-blue-400 font-bold">• Mới</span>
+                                  )}
                                 </span>
                               </div>
                             )
@@ -2862,28 +3022,28 @@ export default function AdminPage() {
                         </div>
 
                         {/* Reply Form */}
-                        <form onSubmit={handleSendReply} className="p-2 bg-gray-50 border-t border-gray-200 flex gap-2 shrink-0">
+                        <form onSubmit={handleSendReply} className="p-2 bg-gray-800 border-t border-gray-700 flex gap-2 shrink-0">
                           <input
                             required
                             type="text"
                             value={replyMessage}
                             onChange={(e) => setReplyMessage(e.target.value)}
                             placeholder="Nhập phản hồi..."
-                            className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500 font-semibold h-9"
+                            className="flex-1 bg-gray-900 border border-gray-700 text-gray-200 placeholder-gray-500 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500 font-medium h-9"
                             style={{ fontSize: '16px' }}
                           />
                           <button
                             type="submit"
                             disabled={sendingReply || !replyMessage.trim()}
-                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs px-3.5 h-9 rounded-lg font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs px-3.5 h-9 rounded-lg font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
                           >
                             {sendingReply ? '...' : 'Gửi'}
                           </button>
                         </form>
                       </div>
                     ) : (
-                      <div className="border border-dashed border-gray-300 rounded-xl p-4 text-center text-gray-400 text-xs bg-white flex flex-col items-center justify-center flex-grow select-none min-h-[220px]">
-                        💬 Chọn một cuộc hội thoại từ danh sách để bắt đầu chat hỗ trợ.
+                      <div className="border border-dashed border-gray-700 rounded-xl p-4 text-center text-gray-500 text-xs bg-gray-800/40 flex flex-col items-center justify-center flex-grow select-none min-h-[220px]">
+                        💬 Chọn một cuộc hội thoại từ danh sách để bắt đầu hỗ trợ.
                       </div>
                     )}
                   </div>

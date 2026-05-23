@@ -23,6 +23,16 @@ type TabType = 'rating' | 'preorder' | 'chat'
 export default function FeedbackPage() {
   const [session, setSession] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<TabType>('rating')
+
+  // Cho phép URL query `?tab=preorder` (hoặc chat/rating) chọn tab mặc định
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const t = params.get('tab')
+    if (t === 'preorder' || t === 'chat' || t === 'rating') {
+      setActiveTab(t as TabType)
+    }
+  }, [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -93,10 +103,14 @@ export default function FeedbackPage() {
     if (!identifier) return
 
     try {
+      // Tin nhắn chat lưu trong title = "[Chat] X" (khách gửi) hoặc "[Reply] X" (admin trả lời)
+      // Hỗ trợ luôn legacy data lưu identifier ở content (trước khi fix)
       const { data, error } = await supabase
         .from('feedbacks')
         .select('*')
-        .or(`content.ilike.[Chat] ${identifier}%,content.ilike.[Reply] ${identifier}%`)
+        .or(
+          `title.eq.[Chat] ${identifier},title.eq.[Reply] ${identifier},content.ilike.[Chat] ${identifier}%,content.ilike.[Reply] ${identifier}%`
+        )
         .order('created_at', { ascending: true })
 
       if (error) throw error
@@ -205,12 +219,15 @@ export default function FeedbackPage() {
 
     setLoadingChat(true)
     try {
+      // Lưu identifier vào TITLE (admin parse từ title) và message vào CONTENT
+      // is_read = false để admin biết tin chưa đọc
       const { error } = await supabase
         .from('feedbacks')
         .insert({
           user_id: session?.user?.id || null,
-          content: `[Chat] ${identifier}\n${chatMessage.trim()}`,
-          rating: 5
+          title: `[Chat] ${identifier}`,
+          content: chatMessage.trim(),
+          is_read: false,
         })
 
       if (error) throw error
@@ -218,8 +235,11 @@ export default function FeedbackPage() {
       fetchChats()
     } catch (err: any) {
       console.error(err)
-      if (err.message?.toLowerCase().includes('row-level security') || err.message?.toLowerCase().includes('violates row-level security')) {
-        alert('💡 Chào Quyết! Không thể gửi tin nhắn do chính sách bảo mật (RLS) trên bảng "feedbacks" của bạn đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard -> SQL Editor và chạy dòng lệnh sau để mở quyền:\n\nCREATE POLICY "Allow public insert feedbacks" ON public.feedbacks FOR INSERT WITH CHECK (true);\nCREATE POLICY "Allow public select feedbacks" ON public.feedbacks FOR SELECT USING (true);')
+      const msg = (err.message || '').toLowerCase()
+      if (msg.includes('row-level security') || msg.includes('violates row-level security')) {
+        alert('💡 Chào Quyết! Không thể gửi tin nhắn do chính sách bảo mật (RLS) trên bảng "feedbacks" đang chặn quyền ghi.\n\nVui lòng mở Supabase Dashboard → SQL Editor và chạy:\n\nCREATE POLICY "Allow public insert feedbacks" ON public.feedbacks FOR INSERT WITH CHECK (true);\nCREATE POLICY "Allow public select feedbacks" ON public.feedbacks FOR SELECT USING (true);')
+      } else if (msg.includes('column') || msg.includes('schema cache') || msg.includes('is_read') || msg.includes('title')) {
+        alert('💡 Chào Quyết! Bảng "feedbacks" trong database chưa có đủ các cột cần thiết (title / rating / is_read).\n\nVui lòng mở Supabase Dashboard → SQL Editor và chạy:\n\nALTER TABLE public.feedbacks ADD COLUMN IF NOT EXISTS title text;\nALTER TABLE public.feedbacks ADD COLUMN IF NOT EXISTS rating integer;\nALTER TABLE public.feedbacks ADD COLUMN IF NOT EXISTS is_read boolean DEFAULT false;\n\n-- Cho phép admin cập nhật trạng thái đã đọc và xoá tin:\nCREATE POLICY "Allow public update feedbacks" ON public.feedbacks FOR UPDATE USING (true) WITH CHECK (true);\nCREATE POLICY "Allow public delete feedbacks" ON public.feedbacks FOR DELETE USING (true);')
       } else {
         alert('Không thể gửi tin nhắn: ' + err.message)
       }
@@ -466,19 +486,33 @@ export default function FeedbackPage() {
           <div className="w-full bg-white rounded-2xl sm:rounded-3xl shadow-lg shadow-slate-100 border border-slate-150 flex flex-col h-[520px] overflow-hidden">
             
             {/* Header */}
-            <div style={{ padding: '1rem 1.5rem' }} className="bg-gradient-to-r from-emerald-600 to-teal-500 flex items-center justify-between shrink-0 shadow-md">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white border border-white/20">
+            <div style={{ padding: '1rem 1.5rem' }} className="bg-gradient-to-r from-emerald-600 to-teal-500 flex items-center justify-between shrink-0 shadow-md gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white border border-white/20 shrink-0">
                   💬
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-white text-base leading-tight">Admin Hải Sản Sạch</h3>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-white text-base leading-tight truncate">Admin Hải Sản Sạch</h3>
                   <span className="text-[10px] text-emerald-100 font-bold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
                     Đang online để hỗ trợ bạn
                   </span>
                 </div>
               </div>
+
+              {/* Nút Zalo trực tiếp — phòng khi khách muốn liên hệ ngay không qua chat */}
+              <a
+                href="https://zalo.me/0964671009"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Mở Zalo: 0964 671 009"
+                className="shrink-0 flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/30 rounded-full pl-2 pr-3 py-1.5 text-white text-[11px] font-bold transition-all active:scale-95 backdrop-blur-sm"
+              >
+                <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-black text-blue-600">Z</span>
+                </span>
+                <span className="font-mono tracking-tight">0964 671 009</span>
+              </a>
             </div>
 
             {/* Content area */}
@@ -532,15 +566,22 @@ export default function FeedbackPage() {
                     </div>
                   ) : (
                     chatHistory.map((chat) => {
-                      const isReply = (chat.content as string).startsWith('[Reply]')
+                      // Phân loại: ưu tiên title (data mới), fallback content (legacy)
+                      const titleStr = (chat.title as string | null) || ''
+                      const contentStr = (chat.content as string) || ''
+                      const isReply = titleStr.startsWith('[Reply]') || contentStr.startsWith('[Reply]')
+                      // Lấy message: nếu title có prefix thì content là message thuần, còn không thì strip prefix khỏi content
+                      const messageText = titleStr.startsWith('[Chat]') || titleStr.startsWith('[Reply]')
+                        ? contentStr
+                        : contentStr.replace(/^\[(?:Chat|Reply)\][^\n]*\n?/, '')
                       return (
                         <div key={chat.id} style={{ marginBottom: '0.875rem' }} className={`flex flex-col ${isReply ? 'items-start' : 'items-end'}`}>
                           <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                            isReply 
-                              ? 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm' 
+                            isReply
+                              ? 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm'
                               : 'bg-emerald-600 text-white rounded-tr-sm'
                           }`}>
-                            {(chat.content as string).replace(/^\[(?:Chat|Reply)\][^\n]*\n?/, '')}
+                            {messageText}
                           </div>
                           <span className="text-[9px] text-slate-400 font-semibold mt-1 px-1">
                             {new Date(chat.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
