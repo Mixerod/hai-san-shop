@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 * {
@@ -14,6 +15,50 @@ html, body {
 
 body {
   font-family: 'Inter', sans-serif;
+}
+
+/* =========================================================
+   Admin shell — Light theme override
+   Áp dụng khi root div admin có attribute data-theme="light".
+   Chỉ override surface/text gray scale, giữ nguyên accent colors.
+   ========================================================= */
+.admin-shell[data-theme="light"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+.admin-shell[data-theme="light"] .bg-gray-950 { background-color: #f8fafc !important; }
+.admin-shell[data-theme="light"] .bg-gray-900 { background-color: #ffffff !important; }
+.admin-shell[data-theme="light"] .bg-gray-900\/50 { background-color: rgba(248, 250, 252, 0.6) !important; }
+.admin-shell[data-theme="light"] .bg-gray-800 { background-color: #f1f5f9 !important; }
+.admin-shell[data-theme="light"] .bg-gray-800\/50 { background-color: rgba(241, 245, 249, 0.6) !important; }
+.admin-shell[data-theme="light"] .bg-gray-800\/80 { background-color: rgba(241, 245, 249, 0.95) !important; }
+.admin-shell[data-theme="light"] .bg-gray-800\/60 { background-color: rgba(226, 232, 240, 0.6) !important; }
+.admin-shell[data-theme="light"] .bg-gray-700 { background-color: #e2e8f0 !important; }
+.admin-shell[data-theme="light"] .hover\:bg-gray-800:hover { background-color: #f1f5f9 !important; }
+.admin-shell[data-theme="light"] .hover\:bg-gray-700:hover { background-color: #e2e8f0 !important; }
+.admin-shell[data-theme="light"] .hover\:bg-gray-600:hover { background-color: #cbd5e1 !important; }
+
+.admin-shell[data-theme="light"] .border-gray-800 { border-color: #e2e8f0 !important; }
+.admin-shell[data-theme="light"] .border-gray-800\/50 { border-color: rgba(226, 232, 240, 0.5) !important; }
+.admin-shell[data-theme="light"] .border-gray-700 { border-color: #cbd5e1 !important; }
+.admin-shell[data-theme="light"] .border-gray-700\/50 { border-color: rgba(203, 213, 225, 0.5) !important; }
+.admin-shell[data-theme="light"] .border-gray-600 { border-color: #94a3b8 !important; }
+.admin-shell[data-theme="light"] .hover\:border-gray-600:hover { border-color: #94a3b8 !important; }
+.admin-shell[data-theme="light"] .divide-gray-800 > * + * { border-color: #e2e8f0 !important; }
+.admin-shell[data-theme="light"] .divide-gray-700\/50 > * + * { border-color: rgba(203, 213, 225, 0.5) !important; }
+
+.admin-shell[data-theme="light"] .text-gray-100 { color: #0f172a !important; }
+.admin-shell[data-theme="light"] .text-gray-200 { color: #1e293b !important; }
+.admin-shell[data-theme="light"] .text-gray-300 { color: #334155 !important; }
+.admin-shell[data-theme="light"] .text-gray-400 { color: #475569 !important; }
+.admin-shell[data-theme="light"] .text-gray-500 { color: #64748b !important; }
+.admin-shell[data-theme="light"] .text-gray-600 { color: #94a3b8 !important; }
+.admin-shell[data-theme="light"] .placeholder-gray-600::placeholder { color: #94a3b8 !important; }
+
+/* Status select option in light mode */
+.admin-shell[data-theme="light"] select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 /* Custom Unlayered Form Spacing Utility Classes */

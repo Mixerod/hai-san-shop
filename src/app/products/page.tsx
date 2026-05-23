@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -134,6 +134,18 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState('Tất cả')
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const categories = ['Tất cả', 'Cá tươi', 'Cá khô', 'Tôm', 'Cua', 'Mực', 'Chả', 'Nước mắm', 'Khác']
+
+  // Tag filter — ưu tiên sản phẩm có tag lên trên, không ẩn các loại khác
+  const [selectedTag, setSelectedTag] = useState<string>('all')
+  const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const TAG_OPTIONS: { value: string; label: string; icon: string; chip: string }[] = [
+    { value: 'all', label: 'Mặc định', icon: '✨', chip: 'bg-slate-100 text-slate-650 border-slate-200/60' },
+    { value: 'new', label: 'Hàng mới', icon: '⚡', chip: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    { value: 'best_seller', label: 'Bán chạy', icon: '🔥', chip: 'bg-orange-50 text-orange-700 border-orange-200' },
+    { value: 'rare', label: 'Hải sản hiếm', icon: '💎', chip: 'bg-purple-50 text-purple-700 border-purple-200' },
+    { value: 'premium', label: 'Ngon đặc biệt', icon: '👑', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
+  ]
+  const selectedTagOption = TAG_OPTIONS.find(t => t.value === selectedTag) || TAG_OPTIONS[0]
 
   // Search & Suggestion states
   const [searchQuery, setSearchQuery] = useState('')
@@ -483,12 +495,32 @@ export default function ProductsPage() {
 
 
 
-  const filteredProducts = sortProducts(products).filter((p) => {
-    const matchesCategory = selectedCategory === 'Tất cả' || getFallbackCategory(p) === selectedCategory
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    return matchesCategory && matchesSearch
-  })
+  const filteredProducts = (() => {
+    // 1) Lọc + sắp xếp theo danh mục/tên như cũ
+    const base = sortProducts(products).filter((p) => {
+      const matchesCategory = selectedCategory === 'Tất cả' || getFallbackCategory(p) === selectedCategory
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      return matchesCategory && matchesSearch
+    })
+    // 2) Nếu chọn 1 tag cụ thể → đẩy SP có tag đó lên trên (không ẩn các SP khác).
+    //    JS Array.sort là stable (ES2019+) nên giữ nguyên thứ tự nội bộ của 2 nhóm.
+    if (selectedTag === 'all') return base
+    return [...base].sort((a, b) => {
+      const aMatch = (a.tag || 'none') === selectedTag ? 0 : 1
+      const bMatch = (b.tag || 'none') === selectedTag ? 0 : 1
+      return aMatch - bMatch
+    })
+  })()
+
+  // Vị trí ranh giới giữa SP có tag và SP không có tag (để vẽ separator)
+  const tagBoundaryIndex = (() => {
+    if (selectedTag === 'all') return -1
+    const idx = filteredProducts.findIndex(p => (p.tag || 'none') !== selectedTag)
+    // Chỉ vẽ separator khi vừa có SP match vừa có SP không match
+    if (idx <= 0 || idx >= filteredProducts.length) return -1
+    return idx
+  })()
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100">
@@ -704,12 +736,12 @@ export default function ProductsPage() {
               
               <div className="grid grid-cols-2 gap-2">
                 {categories.map((cat) => {
-                  const count = cat === 'Tất cả' 
-                    ? products.length 
+                  const count = cat === 'Tất cả'
+                    ? products.length
                     : products.filter(p => getFallbackCategory(p) === cat).length;
-                  
+
                   const isSelected = selectedCategory === cat;
-                  
+
                   return (
                     <button
                       key={cat}
@@ -726,8 +758,8 @@ export default function ProductsPage() {
                     >
                       <span className="truncate pr-1">{cat}</span>
                       <span className={`text-[8px] px-1.5 py-0.5 rounded-md shrink-0 font-bold ${
-                        isSelected 
-                          ? 'bg-white/20 text-white' 
+                        isSelected
+                          ? 'bg-white/20 text-white'
                           : 'bg-slate-200/60 text-slate-550'
                       }`}>
                         {count}
@@ -736,6 +768,86 @@ export default function ProductsPage() {
                   )
                 })}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Lọc theo TAG / loại nổi bật — ưu tiên SP lên trên, không ẩn SP khác */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowTagDropdown(!showTagDropdown)}
+            className={`bg-white hover:bg-slate-50 border font-extrabold text-xs sm:text-sm px-4 sm:px-5 py-3 rounded-2xl transition-all shadow-sm hover:shadow active:scale-95 flex items-center gap-2 cursor-pointer select-none ${
+              selectedTag === 'all' ? 'border-slate-200/80 hover:border-slate-350 text-slate-700' : 'border-blue-300 ring-2 ring-blue-200/60 text-slate-700'
+            }`}
+          >
+            <span className="text-base leading-none">{selectedTagOption.icon}</span>
+            <span>
+              {selectedTag === 'all' ? (
+                <>Loại nổi bật</>
+              ) : (
+                <>Ưu tiên: <strong className="text-blue-600 font-black">{selectedTagOption.label}</strong></>
+              )}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-350 ${showTagDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Underlay */}
+          {showTagDropdown && (
+            <div
+              className="fixed inset-0 z-40 bg-transparent"
+              onClick={() => setShowTagDropdown(false)}
+            />
+          )}
+
+          {/* Panel */}
+          {showTagDropdown && (
+            <div className="absolute top-full left-0 mt-2 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-xl shadow-slate-900/10 p-3 sm:p-4 w-[280px] sm:w-[340px] max-w-[92vw] z-50 animate-in fade-in slide-in-from-top-3 duration-250">
+              <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider mb-2.5 px-1">
+                Đưa lên đầu theo loại nổi bật
+              </p>
+
+              <div className="flex flex-col gap-1.5">
+                {TAG_OPTIONS.map(opt => {
+                  const count = opt.value === 'all'
+                    ? products.length
+                    : products.filter(p => (p.tag || 'none') === opt.value).length;
+                  const isSelected = selectedTag === opt.value;
+
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTag(opt.value);
+                        setShowTagDropdown(false);
+                      }}
+                      disabled={opt.value !== 'all' && count === 0}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer select-none flex items-center justify-between gap-2 border disabled:opacity-40 disabled:cursor-not-allowed ${
+                        isSelected
+                          ? 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/20'
+                          : 'bg-slate-50 hover:bg-white border-slate-200/60 text-slate-700'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-base leading-none shrink-0">{opt.icon}</span>
+                        <span className="truncate">{opt.label}</span>
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-md shrink-0 font-bold ${
+                        isSelected
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-200/60 text-slate-550'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <p className="text-[10px] text-slate-400 font-semibold mt-3 px-1 leading-relaxed border-t border-slate-100 pt-2.5">
+                💡 Chọn loại nổi bật để đẩy các sản phẩm tương ứng lên đầu. Các sản phẩm khác vẫn hiện ở dưới.
+              </p>
             </div>
           )}
         </div>
@@ -842,14 +954,25 @@ export default function ProductsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-6 md:gap-8">
-          {filteredProducts.map((p) => {
+          {filteredProducts.map((p, idx) => {
             const tagClass = p.tag === 'best_seller' ? 'tag-best-seller' :
                              p.tag === 'rare' ? 'tag-rare' :
                              p.tag === 'new' ? 'tag-new' :
                              p.tag === 'premium' ? 'tag-premium' : '';
+            // Separator: vạch mờ giữa nhóm SP có tag được ưu tiên và nhóm còn lại
+            const showSeparator = idx === tagBoundaryIndex;
             return (
-              <div 
-                key={p.id} 
+              <Fragment key={p.id}>
+              {showSeparator && (
+                <div className="col-span-full flex items-center gap-3 my-2 select-none">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-2">
+                    Sản phẩm khác
+                  </span>
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+                </div>
+              )}
+              <div
                 className={`bg-white border border-slate-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-blue-900/5 hover:-translate-y-2 hover:border-blue-500/10 transition-all duration-500 flex flex-col group relative ${tagClass}`}
               >
                 {/* Image Container with Zoom effect */}
@@ -1178,6 +1301,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
               </div>
+              </Fragment>
             )
           })}
         </div>
