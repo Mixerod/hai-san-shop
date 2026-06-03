@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useCart } from '@/store/cart'
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 
 function CheckoutForm() {
-  const { items, total, clear, updateQty, remove } = useCart()
+  const { items, total, clear, updateQty, remove, syncPrices } = useCart()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -131,6 +131,28 @@ function CheckoutForm() {
       subscription.unsubscribe()
     }
   }, [])
+
+  // Đồng bộ giá giỏ hàng theo giá hiện tại trong DB khi vào trang thanh toán.
+  // Tránh trường hợp giá cũ bị kẹt trong localStorage khiến đơn mới vẫn ra giá cũ.
+  const pricesSyncedRef = useRef(false)
+  useEffect(() => {
+    if (pricesSyncedRef.current || items.length === 0) return
+    pricesSyncedRef.current = true
+
+    const ids = items.map(i => i.id)
+    supabase
+      .from('products')
+      .select('id, price')
+      .in('id', ids)
+      .then(({ data, error }) => {
+        if (error || !data) return
+        const priceMap: Record<string, number> = {}
+        data.forEach((p: { id: string; price: number }) => {
+          priceMap[p.id] = p.price
+        })
+        syncPrices(priceMap)
+      })
+  }, [items, syncPrices])
 
   // Safeguard: Force delivery method to 'company' if totalKg is less than 5
   useEffect(() => {

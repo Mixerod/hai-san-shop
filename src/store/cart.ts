@@ -14,6 +14,7 @@ type CartStore = {
   add: (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => void
   remove: (id: string) => void
   updateQty: (id: string, quantity: number) => void
+  syncPrices: (priceMap: Record<string, number>) => void
   clear: () => void
   total: () => number
   isOpen: boolean
@@ -47,6 +48,15 @@ export const useCart = create<CartStore>()(
 
       updateQty: (id, quantity) => set((state) => ({
         items: state.items.map(i => i.id === id ? { ...i, quantity } : i)
+      })),
+
+      // Đồng bộ giá giỏ hàng theo giá hiện tại trong DB (tránh giá cũ kẹt trong localStorage)
+      syncPrices: (priceMap) => set((state) => ({
+        items: state.items.map(i =>
+          priceMap[i.id] !== undefined && priceMap[i.id] !== i.price
+            ? { ...i, price: priceMap[i.id] }
+            : i
+        )
       })),
 
       clear: () => set({ items: [] }),

@@ -54,7 +54,8 @@ type OrderItem = {
   products: {
     name: string;
     unit: string;
-  };
+    price: number | null;
+  } | null;
 };
 
 type Order = {
@@ -156,6 +157,23 @@ const getOrderWeight = (order: Order) => {
     }
     return acc;
   }, 0);
+};
+
+// Giá dùng để tính tiền trên dashboard: ƯU TIÊN giá hiện tại của sản phẩm
+// (đã được admin cập nhật), chỉ fallback về price_at_time khi sản phẩm đã bị xoá
+// hoặc chưa có giá. Nhờ đó dashboard luôn tính theo giá MỚI nhất.
+const getItemPrice = (item: OrderItem): number => {
+  const currentPrice = item.products?.price;
+  if (typeof currentPrice === "number" && currentPrice > 0) return currentPrice;
+  return item.price_at_time || 0;
+};
+
+// Tổng tiền 1 đơn tính lại theo giá hiện tại của từng món
+const getOrderTotal = (order: Order): number => {
+  return (order.order_items || []).reduce(
+    (sum, item) => sum + getItemPrice(item) * (item.quantity || 0),
+    0,
+  );
 };
 
 const getDeliveryType = (order: Order) => {
@@ -460,7 +478,7 @@ export default function AdminPage() {
   const copyZaloMessage = (order: Order) => {
     const name = order.profiles?.full_name || "bạn";
     const shortId = order.id.slice(0, 8).toUpperCase();
-    const total = order.total_amount.toLocaleString("vi-VN");
+    const total = getOrderTotal(order).toLocaleString("vi-VN");
     const message = `Xin chào ${name}, đơn hàng hải sản của bạn (Mã đơn: ${shortId}) đã được giao đến nơi an toàn. Tổng chi phí cho đơn hàng này là ${total}đ. Bạn vui lòng sắp xếp thời gian để nhận hàng nhé. Xin cảm ơn bạn đã đặt hàng!\n(Đây là tin nhắn tự động từ hệ thống Hải Sản Sạch)`;
 
     navigator.clipboard.writeText(message);
@@ -713,7 +731,7 @@ export default function AdminPage() {
           `
           *,
           profiles(full_name, phone),
-          order_items(*, products(name, unit))
+          order_items(*, products(name, unit, price))
         `,
         )
         .order("created_at", { ascending: false });
@@ -784,7 +802,7 @@ export default function AdminPage() {
         if (getDeliveryType(order) !== advFilter.deliveryType) return false;
       }
       if (advFilter.minAmount > 0) {
-        if ((order.total_amount || 0) < advFilter.minAmount) return false;
+        if (getOrderTotal(order) < advFilter.minAmount) return false;
       }
       if (advFilter.hasNote !== 'all') {
         const hasNote = !!order.note && order.note.trim().length > 0;
@@ -809,7 +827,7 @@ export default function AdminPage() {
             cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
             break;
           case 'total':
-            cmp = (a.total_amount || 0) - (b.total_amount || 0);
+            cmp = getOrderTotal(a) - getOrderTotal(b);
             break;
           case 'weight': {
             const wa = (a.order_items || []).reduce((s, it) => s + (it.quantity || 0), 0);
@@ -1055,11 +1073,12 @@ export default function AdminPage() {
     const uniqueCustomers = new Set<string>();
 
     filteredOrders.forEach((o) => {
+      const orderTotal = getOrderTotal(o);
       if (o.status === "paid") {
-        revenue += o.total_amount;
+        revenue += orderTotal;
       } else if (o.status !== "cancelled") {
         // Bất kỳ đơn nào chưa được tick "Đã thanh toán" và chưa bị huỷ → tính là chưa thu
-        pendingPayment += o.total_amount;
+        pendingPayment += orderTotal;
         unpaidCount += 1;
       }
 
@@ -1239,18 +1258,19 @@ export default function AdminPage() {
         }
 
         const agg = customerMap.get(key)!;
-        agg.total += order.total_amount;
+        agg.total += getOrderTotal(order);
 
         const statusObj = STATUSES.find((s) => s.value === order.status);
         agg.statuses.add(statusObj ? statusObj.label : order.status);
 
-        // Cộng gộp món hàng (Nhớ dùng price_at_time)
+        // Cộng gộp món hàng theo GIÁ HIỆN TẠI của sản phẩm
         order.order_items.forEach((item) => {
           const pName = item.products?.name || "SP";
-          const pKey = `${pName}-${item.price_at_time}`; // Gộp dựa trên tên và giá mua tại thời điểm đó
+          const unitPrice = getItemPrice(item);
+          const pKey = `${pName}-${unitPrice}`; // Gộp dựa trên tên và giá hiện tại
 
           if (!agg.items.has(pKey)) {
-            agg.items.set(pKey, { qty: 0, price: item.price_at_time });
+            agg.items.set(pKey, { qty: 0, price: unitPrice });
           }
           agg.items.get(pKey)!.qty += item.quantity;
         });
@@ -2022,7 +2042,7 @@ export default function AdminPage() {
                               </td>
                             )}
                             <td className="px-3 py-2 text-right font-mono font-extrabold text-blue-400 whitespace-nowrap">
-                              {order.total_amount.toLocaleString('vi-VN')}
+                              {getOrderTotal(order).toLocaleString('vi-VN')}
                             </td>
                             {visibleFields.payment && (
                               <td className="px-2 py-2 text-center whitespace-nowrap">
@@ -2230,7 +2250,7 @@ export default function AdminPage() {
                             )}
                             <td className="px-5 py-4 whitespace-nowrap text-right">
                               <p className="font-extrabold text-gray-900 text-sm">
-                                {order.total_amount.toLocaleString("vi-VN")}đ
+                                {getOrderTotal(order).toLocaleString("vi-VN")}đ
                               </p>
                               <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-wider">
                                 {order.payment_method === "cod" ? "COD" : "Bank (CK)"}
@@ -2328,7 +2348,7 @@ export default function AdminPage() {
                 (sum, o) => sum + (o.order_items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0),
                 0
               );
-              const selectedTotalAmount = selectedOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+              const selectedTotalAmount = selectedOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
               const productAgg: Record<string, { qty: number; unit: string }> = {};
               selectedOrders.forEach(o => o.order_items?.forEach(it => {
                 const name = it.products?.name || 'SP';
