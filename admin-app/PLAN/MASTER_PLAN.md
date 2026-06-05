@@ -56,13 +56,13 @@ Phase 1 (Setup)
 ## Status Checklist
 - [x] **Phase 1** — Setup & Cấu trúc dự án → `PHASE_1_SETUP.md` ✅
 - [x] **Phase 2** — Authentication → `PHASE_2_AUTH.md` ✅
-- [ ] **Phase 3** — Quản lý Đơn hàng → `PHASE_3_ORDERS.md`
-- [ ] **Phase 4** — Push Notifications → `PHASE_4_PUSH_NOTIF.md`
-- [ ] **Phase 5** — Dashboard & Thống kê → `PHASE_5_DASHBOARD.md`
-- [ ] **Phase 6** — Quản lý Sản phẩm → `PHASE_6_PRODUCTS.md`
-- [ ] **Phase 7** — Feedbacks & Chat → `PHASE_7_CHAT.md`
-- [ ] **Phase 8** — Batch Preparation → `PHASE_8_BATCH.md`
-- [ ] **Phase 9** — Broadcast Notifications → `PHASE_9_BROADCAST.md`
+- [x] **Phase 3** — Quản lý Đơn hàng → `PHASE_3_ORDERS.md` ✅
+- [x] **Phase 4** — Push Notifications → `PHASE_4_PUSH_NOTIF.md` ✅
+- [x] **Phase 5** — Dashboard & Thống kê → `PHASE_5_DASHBOARD.md` ✅
+- [x] **Phase 6** — Quản lý Sản phẩm → `PHASE_6_PRODUCTS.md` ✅
+- [x] **Phase 7** — Feedbacks & Chat → `PHASE_7_CHAT.md` ✅
+- [x] **Phase 8** — Batch Preparation → `PHASE_8_BATCH.md` ✅
+- [x] **Phase 9** — Broadcast Notifications → `PHASE_9_BROADCAST.md` ✅
 
 ## Cách sử dụng các file .md này
 1. Mỗi file `.md` là **self-contained** — agent chỉ cần đọc file đó là đủ thông tin để thực thi

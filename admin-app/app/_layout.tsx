@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
+import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
 
 export default function RootLayout() {
   const { session, isAdmin, setSession } = useAuthStore();
@@ -27,6 +28,24 @@ export default function RootLayout() {
       router.replace('/(tabs)/orders');
     }
   }, [session, isAdmin, segments]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    registerForPushNotifications().catch(console.error);
+
+    const cleanup = setupNotificationListeners(
+      undefined,
+      (response) => {
+        const data = response.notification.request.content.data;
+        if (data?.type === 'new_order') {
+          router.push('/(tabs)/orders');
+        }
+      }
+    );
+
+    return cleanup;
+  }, [session]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
