@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput, Switch, Alert, ActivityIndicator, Modal, ScrollView,
@@ -11,6 +11,7 @@ import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { Product, ProductTag } from '@/types';
 import ErrorView from '@/components/ErrorView';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const CATEGORIES = ['haisan','cá tươi','cá khô','tôm','cua','mực','chả','nước mắm','khác'];
 const TAGS: { value: ProductTag; label: string }[] = [
@@ -193,9 +194,11 @@ export default function ProductsScreen() {
     await commitSave(imageUrl);
   }
 
+  const debouncedSearch = useDebounce(search);
+
   const filtered = useMemo(() =>
-    products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase())),
-    [products, search]
+    products.filter(p => !debouncedSearch || p.name.toLowerCase().includes(debouncedSearch.toLowerCase())),
+    [products, debouncedSearch]
   );
 
   if (loading) {
@@ -355,7 +358,7 @@ export default function ProductsScreen() {
   );
 }
 
-function FormField({ label, value, onChangeText, multiline, keyboardType }: {
+const FormField = memo(function FormField({ label, value, onChangeText, multiline, keyboardType }: {
   label: string; value: string; onChangeText: (v: string) => void;
   multiline?: boolean; keyboardType?: TextInputProps['keyboardType'];
 }) {
@@ -373,7 +376,7 @@ function FormField({ label, value, onChangeText, multiline, keyboardType }: {
       />
     </View>
   );
-}
+});
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#030712' },

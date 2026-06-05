@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -284,7 +284,7 @@ interface StatCardProps {
   isTablet?: boolean;
 }
 
-function StatCard({ icon, label, value, color, isTablet }: StatCardProps) {
+const StatCard = memo(function StatCard({ icon, label, value, color, isTablet }: StatCardProps) {
   return (
     <View style={[statStyles.card, { borderColor: color + '33' }, isTablet ? { flexBasis: '28%' } : { flexBasis: '45%' }]}>
       <View style={[statStyles.iconBox, { backgroundColor: color + '22' }]}>
@@ -294,7 +294,7 @@ function StatCard({ icon, label, value, color, isTablet }: StatCardProps) {
       <Text style={[statStyles.value, { color }]}>{value}</Text>
     </View>
   );
-}
+});
 
 const statStyles = StyleSheet.create({
   card: {

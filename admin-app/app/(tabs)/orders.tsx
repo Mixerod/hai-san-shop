@@ -15,6 +15,7 @@ import { Order, OrderStatus } from '@/types';
 import OrderCard from '@/components/orders/OrderCard';
 import StatusFilterBar from '@/components/orders/StatusFilterBar';
 import ErrorView from '@/components/ErrorView';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -63,14 +64,16 @@ export default function OrdersScreen() {
     setRefreshing(false);
   }, [filterStatus]);
 
+  const debouncedSearch = useDebounce(search);
+
   const filteredOrders = useMemo(() => orders.filter(order => {
-    if (!search.trim()) return true;
-    const s = search.toLowerCase();
+    if (!debouncedSearch.trim()) return true;
+    const s = debouncedSearch.toLowerCase();
     const name = order.profiles?.full_name?.toLowerCase() ?? '';
     const phone = order.profiles?.phone ?? '';
     const note = order.note?.toLowerCase() ?? '';
     return name.includes(s) || phone.includes(s) || note.includes(s);
-  }), [orders, search]);
+  }), [orders, debouncedSearch]);
 
   async function updateStatus(orderId: string, newStatus: OrderStatus) {
     const { error } = await supabase

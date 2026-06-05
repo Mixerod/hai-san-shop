@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import ErrorView from '@/components/ErrorView';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface CustomerBatch {
   key: string;
@@ -179,23 +180,26 @@ export default function BatchScreen() {
     Alert.alert('Đã copy', 'Nội dung đã sao chép vào clipboard');
   }
 
+  const debouncedSearch = useDebounce(search);
+  const debouncedProduct = useDebounce(filterProduct);
+
   const filtered = useMemo(() => batches.filter(batch => {
     if (filterDelivery !== 'all' && batch.deliveryType !== filterDelivery) return false;
     if (minWeight && batch.totalWeight < parseFloat(minWeight)) return false;
-    if (filterProduct) {
+    if (debouncedProduct) {
       const hasProduct = batch.items.some(i =>
-        i.name.toLowerCase().includes(filterProduct.toLowerCase())
+        i.name.toLowerCase().includes(debouncedProduct.toLowerCase())
       );
       if (!hasProduct) return false;
     }
-    if (search) {
-      const sv = search.toLowerCase();
+    if (debouncedSearch) {
+      const sv = debouncedSearch.toLowerCase();
       if (!batch.name.toLowerCase().includes(sv) &&
           !batch.phone.includes(sv) &&
           !batch.note.toLowerCase().includes(sv)) return false;
     }
     return true;
-  }), [batches, filterDelivery, minWeight, filterProduct, search]);
+  }), [batches, filterDelivery, minWeight, debouncedProduct, debouncedSearch]);
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator color="#38bdf8" size="large" /></View>;
@@ -284,6 +288,10 @@ export default function BatchScreen() {
             <Text style={s.emptyText}>Không có đơn hàng cần chuẩn bị</Text>
           </View>
         }
+        removeClippedSubviews
+        initialNumToRender={8}
+        maxToRenderPerBatch={5}
+        windowSize={8}
         renderItem={({ item }) => {
           const expanded = expandedKeys.has(item.key);
           return (

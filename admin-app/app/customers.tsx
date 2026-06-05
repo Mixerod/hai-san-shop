@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, RefreshControl, ActivityIndicator,
@@ -9,6 +9,7 @@ import { ArrowLeft, User, Phone, MapPin, ShoppingCart, DollarSign, Search } from
 import { supabase } from '@/lib/supabase';
 import ErrorView from '@/components/ErrorView';
 import { formatDateTime } from '@/lib/formatDate';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface Customer {
   id: string;
@@ -72,11 +73,15 @@ export default function CustomersScreen() {
     setRefreshing(false);
   }, []);
 
-  const filtered = customers.filter(c => {
-    if (!search.trim()) return true;
-    const s = search.toLowerCase();
-    return (c.full_name ?? '').toLowerCase().includes(s) || (c.phone ?? '').includes(s);
-  });
+  const debouncedSearch = useDebounce(search);
+
+  const filtered = useMemo(() => {
+    return customers.filter(c => {
+      if (!debouncedSearch.trim()) return true;
+      const s = debouncedSearch.toLowerCase();
+      return (c.full_name ?? '').toLowerCase().includes(s) || (c.phone ?? '').includes(s);
+    });
+  }, [customers, debouncedSearch]);
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator color="#38bdf8" size="large" /></View>;
@@ -118,6 +123,10 @@ export default function CustomersScreen() {
             <Text style={s.emptyText}>Chưa có khách hàng nào</Text>
           </View>
         }
+        removeClippedSubviews
+        initialNumToRender={10}
+        maxToRenderPerBatch={5}
+        windowSize={10}
         renderItem={({ item }) => (
           <View style={s.card}>
             <View style={s.avatar}>
