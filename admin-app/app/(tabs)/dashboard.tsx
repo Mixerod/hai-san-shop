@@ -22,6 +22,7 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import ErrorView from '@/components/ErrorView';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface Stats {
   totalRevenue: number;
@@ -67,6 +68,7 @@ function getPeriodStart(period: Period): string | null {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { isTablet, fs } = useResponsive();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -176,8 +178,8 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Stats grid */}
-        <View style={styles.grid}>
+        {/* Stats grid — 3 cols on tablet, 2 on phone */}
+        <View style={[styles.grid, isTablet && styles.gridTablet]}>
           <StatCard
             icon={<DollarSign color="#22c55e" size={22} />}
             label="Doanh thu"
@@ -292,7 +294,8 @@ const statStyles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     padding: 16,
-    width: '48%',
+    flexGrow: 1,
+    flexBasis: '45%',   // ≥2 per row on phone, more on tablet via gridTablet
     gap: 8,
   },
   iconBox: {
@@ -342,4 +345,5 @@ const styles = StyleSheet.create({
   todayLabel: { color: '#6b7280', fontSize: 13 },
   todayValue: { color: '#f9fafb', fontSize: 22, fontWeight: '700' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  gridTablet: { gap: 16 }, // tablet: more spacing, cards fill 3-per-row via flexBasis
 });

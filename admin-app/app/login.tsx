@@ -9,12 +9,15 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 
 const ADMIN_EMAIL = 'minhquyet08122003@gmail.com';
 
 export default function LoginScreen() {
+  const { width } = useWindowDimensions();
+  const cardMaxWidth = Math.min(420, width - 32); // never overflow on any screen
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,7 +58,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.card}>
+      <View style={[styles.card, { maxWidth: cardMaxWidth }]}>
         <Text style={styles.logo}>🐟</Text>
         <Text style={styles.title}>Hải Sản Shop</Text>
         <Text style={styles.subtitle}>Admin Dashboard</Text>
