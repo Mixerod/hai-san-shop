@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -16,6 +17,7 @@ import OrderCard from '@/components/orders/OrderCard';
 import StatusFilterBar from '@/components/orders/StatusFilterBar';
 import ErrorView from '@/components/ErrorView';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -26,6 +28,7 @@ export default function OrdersScreen() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const channelId = useRef(`orders-${Math.random().toString(36).slice(2)}`);
   const isMounted = useRef(true);
+  const { fs } = useResponsive();
 
   useEffect(() => {
     isMounted.current = true;
@@ -59,14 +62,42 @@ export default function OrdersScreen() {
   }, [filterStatus]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(channelId.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        if (isMounted.current) fetchOrders();
-      })
-      .subscribe();
+    let channel: any = null;
 
-    return () => { supabase.removeChannel(channel); };
+    function subscribeRealtime() {
+      if (channel) return;
+      channel = supabase
+        .channel(channelId.current)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+          if (isMounted.current) fetchOrders();
+        })
+        .subscribe();
+    }
+
+    function unsubscribeRealtime() {
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    }
+
+    if (AppState.currentState === 'active') {
+      subscribeRealtime();
+    }
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        subscribeRealtime();
+        if (isMounted.current) fetchOrders();
+      } else {
+        unsubscribeRealtime();
+      }
+    });
+
+    return () => {
+      unsubscribeRealtime();
+      subscription.remove();
+    };
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -110,13 +141,13 @@ export default function OrdersScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Đơn hàng</Text>
-        <Text style={styles.headerCount}>{filteredOrders.length} đơn</Text>
+        <Text style={[styles.headerTitle, { fontSize: fs(20) }]}>Đơn hàng</Text>
+        <Text style={[styles.headerCount, { fontSize: fs(14) }]}>{filteredOrders.length} đơn</Text>
       </View>
 
       <View style={styles.searchContainer}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { fontSize: fs(14) }]}
           value={search}
           onChangeText={setSearch}
           placeholder="Tìm tên, SĐT, ghi chú..."
@@ -142,7 +173,7 @@ export default function OrdersScreen() {
         windowSize={10}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>Không có đơn hàng</Text>
+            <Text style={[styles.emptyText, { fontSize: fs(16) }]}>Không có đơn hàng</Text>
           </View>
         }
       />

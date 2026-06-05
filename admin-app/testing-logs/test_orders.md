@@ -39,3 +39,19 @@
    * **Thêm `isMounted` Ref Guard**: Tương tự như Chat, đã cài đặt bộ bảo vệ `isMounted` ref để ngắt toàn bộ lệnh gọi `setState` nếu admin thoát tab hoặc chuyển màn hình nhanh trước khi Supabase phản hồi dữ liệu.
 
 4. **Kiểm thử biên dịch**: Chạy `npx tsc --noEmit` thành công 100% không có lỗi.
+
+### 🛠️ Cải tiến giao diện và Đọc thông tin ghi chú khách hàng (Phiên B & D)
+1. **Chống Spam Nút Bấm (Request Spamming)**:
+   - Trước đây, nút chuyển trạng thái nhanh trên `OrderCard` không có cờ loading/disabled riêng biệt, dẫn đến rủi ro admin nhấn đúp (double-click) liên tiếp gửi nhiều request cập nhật DB cùng lúc.
+   - Tôi đã bổ sung trạng thái `updating` nội bộ cho từng `OrderCard.tsx`. Khi admin nhấn cập nhật trạng thái, nút đó sẽ hiển thị `ActivityIndicator` và bị khóa bấm, đồng thời khóa bấm tất cả các nút hành động khác của card đó.
+2. **Responsive Font Sizes**:
+   - Tích hợp hook `useResponsive` và helper `fs()` vào `OrderCard.tsx`, `orders.tsx`, và `order-detail.tsx`.
+   - Scale toàn bộ các text tags hiển thị tên khách, SĐT, ngày giờ, số lượng sản phẩm, tổng tiền và nút hành động để giao diện hiển thị hài hòa trên cả điện thoại màn hình nhỏ và máy tính bảng (Tablet).
+3. **Tối ưu hóa kết nối mạng Realtime khi chạy ngầm (Phiên D)**:
+   - Trước đó, Supabase Realtime channel trong `orders.tsx` kết nối WebSocket liên tục ngay cả khi app bị đóng/thu nhỏ (Background state), gây hao pin thiết bị di động và lãng phí băng thông.
+   - Tôi đã tích hợp bộ lắng nghe trạng thái ứng dụng `AppState` vào `orders.tsx`. Khi ứng dụng chuyển sang `background`, app sẽ tự động đóng kết nối (unsubscribe) WebSocket. Ngay khi admin mở lại app (`active`), app sẽ tự động thiết lập lại kết nối và kích hoạt `fetchOrders` để đồng bộ lại dữ liệu đơn hàng mới nhất tức thì.
+4. **Chuẩn hóa Timezone**:
+   - Xác thực helper `formatDateTime` sử dụng `toLocaleString('vi-VN')` giúp hiển thị thời gian chính xác theo múi giờ Việt Nam (UTC+7) trên thiết bị, loại bỏ lỗi lệch múi giờ.
+
+5. **Kiểm thử biên dịch**: Chạy `npx tsc --noEmit` hoàn tất thành công sạch lỗi.
+

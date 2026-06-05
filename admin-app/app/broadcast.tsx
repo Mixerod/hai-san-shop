@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator,
@@ -25,6 +25,14 @@ export default function BroadcastScreen() {
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState<Notification[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   async function fetchHistory() {
     const { data } = await supabase
@@ -32,11 +40,12 @@ export default function BroadcastScreen() {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(20);
+    if (!isMounted.current) return;
     if (data) setHistory(data as Notification[]);
   }
 
   useEffect(() => {
-    fetchHistory().finally(() => setLoadingHistory(false));
+    fetchHistory().finally(() => { if (isMounted.current) setLoadingHistory(false); });
   }, []);
 
   async function sendBroadcast() {
@@ -59,6 +68,7 @@ export default function BroadcastScreen() {
               type,
             });
 
+            if (!isMounted.current) return;
             if (error) {
               Alert.alert('Lỗi', 'Không thể gửi thông báo: ' + error.message);
             } else {
@@ -80,7 +90,7 @@ export default function BroadcastScreen() {
         text: 'Xoá', style: 'destructive',
         onPress: async () => {
           await supabase.from('notifications').delete().eq('id', id);
-          fetchHistory();
+          if (isMounted.current) fetchHistory();
         },
       },
     ]);

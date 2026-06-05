@@ -43,4 +43,12 @@ Tài liệu này phân tích các lỗi tiềm ẩn từ phổ biến, trung bì
 * **Phiên 1: Rà soát & Sửa lỗi Giao diện (UI/Layout & Che khuất)** -> *Hoàn thành*.
 * **Phiên 2: Rà soát Memory Leaks & Polling Cleanups (Chat & Dashboard)** -> *Hoàn thành*.
 * **Phiên 3: Rà soát Supabase Realtime Channels & Network Timeout Edge-Cases** -> *Hoàn thành*.
-* **Phiên 4: Rà soát AsyncStorage & Trạng thái chạy ngầm (App Background state)** -> *Sẽ lên lịch cuối cùng*.
+* **Phiên 4: Rà soát AsyncStorage & Trạng thái chạy ngầm (App Background state)** -> *Hoàn thành*.
+
+---
+
+### 🛠️ Ghi nhận các Phiên rà soát & Sửa lỗi mở rộng mới:
+- **Phiên A (Memory Leak Prevention)**: Bổ sung cờ bảo vệ `isMounted` ref cho 5 file màn hình còn lại: `products.tsx`, `batch.tsx`, `dashboard.tsx`, `customers.tsx`, `broadcast.tsx` để ngăn chặn lỗi cập nhật state khi component unmounted. -> *Hoàn thành*.
+- **Phiên B (Button Spam & Responsive Fonts)**: Thêm trạng thái `updating` cho từng card đơn hàng để khóa bấm nút chuyển trạng thái nhanh, chống spam gửi trùng lặp request; đồng thời tích hợp `useResponsive` và scale font chữ cho Đơn hàng, Chi tiết đơn hàng và Soạn hàng. -> *Hoàn thành*.
+- **Phiên C (Keyboard & Bottom Tab Bar Covers)**: Tích hợp listener lắng nghe Keyboard ẩn hiện để tự động thêm paddingBottom đẩy ô nhập chat chi tiết lên trên Bottom Tab Bar khi bàn phím đóng; thêm padding bottom cho Modal sản phẩm tránh cấn bàn phím. -> *Hoàn thành*.
+- **Phiên D (Background Websocket & Timezone)**: Tối ưu ngắt kết nối WebSocket (Supabase Realtime Channel) trong `orders.tsx` khi app chạy nền (background) và khôi phục khi mở lại app; kiểm tra chuẩn hóa múi giờ hiển thị UTC+7. -> *Hoàn thành*.

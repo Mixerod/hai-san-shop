@@ -15,4 +15,15 @@
 ---
 
 ## 📝 Nhật ký Kiểm thử & Nhật ký Sửa lỗi
-*(Tiến độ kiểm thử sẽ được cập nhật tại đây khi tiến hành chạy test)*
+
+### 🛠️ Sửa lỗi cập nhật State sau khi unmounted màn hình Thống kê (Phiên A)
+1. **Phân tích lỗi**:
+   - Màn hình `dashboard.tsx` liên tục gọi `fetchStats` mỗi khi thay đổi khoảng thời gian lọc dữ liệu (Hôm nay, Tuần này, Tháng này, Tất cả).
+   - Nếu admin chuyển tab cực nhanh hoặc thoát app ngay sau khi chọn bộ lọc, tiến trình fetch bất đồng bộ của Supabase hoàn thành sau đó sẽ gọi `setStats`, `setFetchError` và `.finally(() => setLoading(false))`. Điều này gây lỗi runtime cảnh báo cập nhật state cho component unmounted.
+2. **Khắc phục**:
+   - Bổ sung ref bảo vệ `isMounted` và hook cleanup.
+   - Thêm điều kiện chặn `if (!isMounted.current) return;` sau khi nhận kết quả từ Supabase.
+   - Bảo vệ hàm `.finally` chỉ cập nhật state khi component còn mount.
+3. **Kết quả**:
+   - Cải tiến tính ổn định của app khi chuyển đổi nhanh giữa các tab trong bottom bar, không còn rò rỉ RAM hay warning console.
+   - Trình kiểm biên dịch TypeScript không phát sinh lỗi nào.

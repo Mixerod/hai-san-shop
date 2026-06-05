@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, RefreshControl, ActivityIndicator,
@@ -30,6 +30,14 @@ export default function CustomersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   async function fetchCustomers() {
     // Single joined query instead of 2 separate queries
@@ -37,6 +45,7 @@ export default function CustomersScreen() {
       .from('profiles')
       .select('id, full_name, phone, address, orders(total_amount, status, created_at)');
 
+    if (!isMounted.current) return;
     if (error) {
       setFetchError('Không thể tải danh sách khách hàng.');
       return;
@@ -66,13 +75,13 @@ export default function CustomersScreen() {
   }
 
   useEffect(() => {
-    fetchCustomers().finally(() => setLoading(false));
+    fetchCustomers().finally(() => { if (isMounted.current) setLoading(false); });
   }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchCustomers();
-    setRefreshing(false);
+    if (isMounted.current) setRefreshing(false);
   }, []);
 
   const debouncedSearch = useDebounce(search);

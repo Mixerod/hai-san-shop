@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput, Switch, Alert, ActivityIndicator, Modal, ScrollView,
@@ -41,12 +41,21 @@ export default function ProductsScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   async function fetchProducts() {
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false });
+    if (!isMounted.current) return;
     if (error) {
       setFetchError('Không thể tải sản phẩm. Kiểm tra kết nối mạng.');
     } else if (data) {
@@ -56,13 +65,13 @@ export default function ProductsScreen() {
   }
 
   useEffect(() => {
-    fetchProducts().finally(() => setLoading(false));
+    fetchProducts().finally(() => { if (isMounted.current) setLoading(false); });
   }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchProducts();
-    setRefreshing(false);
+    if (isMounted.current) setRefreshing(false);
   }, []);
 
   function openAdd() {
@@ -161,12 +170,13 @@ export default function ProductsScreen() {
       } else {
         await supabase.from('products').insert(payload);
       }
+      if (!isMounted.current) return;
       setShowModal(false);
       fetchProducts();
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể lưu sản phẩm');
+      if (isMounted.current) Alert.alert('Lỗi', 'Không thể lưu sản phẩm');
     } finally {
-      setSaving(false);
+      if (isMounted.current) setSaving(false);
     }
   }
 
@@ -183,7 +193,7 @@ export default function ProductsScreen() {
       const uploaded = await uploadImage(imageUri);
       if (uploaded === null) {
         Alert.alert('Lỗi upload ảnh', 'Không thể tải ảnh lên. Lưu không có ảnh?', [
-          { text: 'Huỷ', style: 'cancel', onPress: () => setSaving(false) },
+          { text: 'Huỷ', style: 'cancel', onPress: () => { if (isMounted.current) setSaving(false); } },
           { text: 'Lưu không ảnh', onPress: () => commitSave(null) },
         ]);
         return;
@@ -406,7 +416,7 @@ const s = StyleSheet.create({
   modalTitle: { color: '#f9fafb', fontSize: 17, fontWeight: '600' },
   cancelBtn: { color: '#9ca3af', fontSize: 16 },
   saveBtn: { color: '#38bdf8', fontSize: 16, fontWeight: '600' },
-  modalContent: { padding: 16 },
+  modalContent: { padding: 16, paddingBottom: 60 },
   imagePicker: { backgroundColor: '#1f2937', borderRadius: 12, height: 140, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#374151', borderStyle: 'dashed' },
   imagePreview: { width: '100%', height: 140, borderRadius: 12 },
   imagePickerText: { color: '#6b7280', fontSize: 16 },

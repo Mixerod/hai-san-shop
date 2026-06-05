@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput,
@@ -13,6 +13,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import ErrorView from '@/components/ErrorView';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface CustomerBatch {
   key: string;
@@ -54,6 +55,15 @@ export default function BatchScreen() {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [showSummary, setShowSummary] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+  const { fs } = useResponsive();
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   async function fetchBatches() {
     const { data: orders, error } = await supabase
@@ -66,6 +76,7 @@ export default function BatchScreen() {
       .in('status', ['pending', 'confirmed'])
       .order('created_at', { ascending: true });
 
+    if (!isMounted.current) return;
     if (error || !orders) {
       setFetchError('Không thể tải danh sách chuẩn bị hàng. Kiểm tra kết nối mạng.');
       return;
@@ -146,13 +157,13 @@ export default function BatchScreen() {
   }
 
   useEffect(() => {
-    fetchBatches().finally(() => setLoading(false));
+    fetchBatches().finally(() => { if (isMounted.current) setLoading(false); });
   }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchBatches();
-    setRefreshing(false);
+    if (isMounted.current) setRefreshing(false);
   }, []);
 
   function toggleExpand(key: string) {
@@ -212,8 +223,8 @@ export default function BatchScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
-        <Text style={s.headerTitle}>Chuẩn bị hàng</Text>
-        <Text style={s.headerCount}>{filtered.length} khách</Text>
+        <Text style={[s.headerTitle, { fontSize: fs(20) }]}>Chuẩn bị hàng</Text>
+        <Text style={[s.headerCount, { fontSize: fs(14) }]}>{filtered.length} khách</Text>
         <TouchableOpacity onPress={() => { setLoading(true); fetchBatches().finally(() => setLoading(false)); }}>
           <RefreshCcw color="#6b7280" size={20} />
         </TouchableOpacity>
@@ -221,14 +232,14 @@ export default function BatchScreen() {
 
       <View style={s.filters}>
         <TextInput
-          style={s.searchInput}
+          style={[s.searchInput, { fontSize: fs(14) }]}
           value={search}
           onChangeText={setSearch}
           placeholder="Tìm tên, SĐT..."
           placeholderTextColor="#4b5563"
         />
         <TextInput
-          style={s.filterInput}
+          style={[s.filterInput, { fontSize: fs(14) }]}
           value={filterProduct}
           onChangeText={setFilterProduct}
           placeholder="Lọc sản phẩm..."
@@ -236,7 +247,7 @@ export default function BatchScreen() {
         />
         <View style={s.filterRow}>
           <TextInput
-            style={[s.filterInput, { flex: 1 }]}
+            style={[s.filterInput, { flex: 1, fontSize: fs(14) }]}
             value={minWeight}
             onChangeText={(v) => setMinWeight(v.replace(/[^0-9.]/g, ''))}
             placeholder="Min kg..."
@@ -252,7 +263,7 @@ export default function BatchScreen() {
               {d === 'ship' ? <Truck color={filterDelivery === d ? '#38bdf8' : '#6b7280'} size={14} /> :
                d === 'company' ? <Building2 color={filterDelivery === d ? '#38bdf8' : '#6b7280'} size={14} /> :
                <Filter color={filterDelivery === d ? '#38bdf8' : '#6b7280'} size={14} />}
-              <Text style={[s.deliveryChipText, filterDelivery === d && { color: '#38bdf8' }]}>
+              <Text style={[s.deliveryChipText, { fontSize: fs(13) }, filterDelivery === d && { color: '#38bdf8' }]}>
                 {d === 'all' ? 'Tất cả' : d === 'ship' ? 'Ship' : 'Công ty'}
               </Text>
             </TouchableOpacity>
@@ -262,7 +273,7 @@ export default function BatchScreen() {
 
       <TouchableOpacity style={s.summaryToggle} onPress={() => setShowSummary(!showSummary)}>
         <Package color="#a78bfa" size={16} />
-        <Text style={s.summaryToggleText}>Tổng hợp sản phẩm ({productSummary.length} loại)</Text>
+        <Text style={[s.summaryToggleText, { fontSize: fs(14) }]}>Tổng hợp sản phẩm ({productSummary.length} loại)</Text>
         {showSummary ? <ChevronUp color="#6b7280" size={16} /> : <ChevronDown color="#6b7280" size={16} />}
       </TouchableOpacity>
 
@@ -270,9 +281,9 @@ export default function BatchScreen() {
         <View style={s.summaryBox}>
           {productSummary.map(p => (
             <View key={p.name} style={s.summaryRow}>
-              <Text style={s.summaryName} numberOfLines={1}>{p.name}</Text>
-              <Text style={s.summaryQty}>{p.totalQty.toFixed(1)} {p.unit}</Text>
-              <Text style={s.summaryCount}>{p.customerCount} đơn</Text>
+              <Text style={[s.summaryName, { fontSize: fs(13) }]} numberOfLines={1}>{p.name}</Text>
+              <Text style={[s.summaryQty, { fontSize: fs(13) }]}>{p.totalQty.toFixed(1)} {p.unit}</Text>
+              <Text style={[s.summaryCount, { fontSize: fs(12) }]}>{p.customerCount} đơn</Text>
             </View>
           ))}
         </View>
@@ -285,7 +296,7 @@ export default function BatchScreen() {
         contentContainerStyle={s.list}
         ListEmptyComponent={
           <View style={s.empty}>
-            <Text style={s.emptyText}>Không có đơn hàng cần chuẩn bị</Text>
+            <Text style={[s.emptyText, { fontSize: fs(16) }]}>Không có đơn hàng cần chuẩn bị</Text>
           </View>
         }
         removeClippedSubviews
@@ -298,8 +309,8 @@ export default function BatchScreen() {
             <View style={s.card}>
               <TouchableOpacity onPress={() => toggleExpand(item.key)} style={s.cardHeader}>
                 <View style={s.cardHeaderLeft}>
-                  <Text style={s.customerName}>{item.name}</Text>
-                  {item.phone ? <Text style={s.customerPhone}>{item.phone}</Text> : null}
+                  <Text style={[s.customerName, { fontSize: fs(15) }]}>{item.name}</Text>
+                  {item.phone ? <Text style={[s.customerPhone, { fontSize: fs(13) }]}>{item.phone}</Text> : null}
                 </View>
                 <View style={s.cardHeaderRight}>
                   {item.deliveryType === 'ship' && <Truck color="#38bdf8" size={16} />}
@@ -307,7 +318,7 @@ export default function BatchScreen() {
                   {item.totalWeight > 0 && (
                     <View style={s.weightBadge}>
                       <Scale color="#f59e0b" size={12} />
-                      <Text style={s.weightText}>{item.totalWeight.toFixed(1)}kg</Text>
+                      <Text style={[s.weightText, { fontSize: fs(13) }]}>{item.totalWeight.toFixed(1)}kg</Text>
                     </View>
                   )}
                   {expanded ? <ChevronUp color="#6b7280" size={18} /> : <ChevronDown color="#6b7280" size={18} />}
@@ -316,21 +327,21 @@ export default function BatchScreen() {
 
               {expanded && (
                 <View style={s.cardDetail}>
-                  {item.address ? <Text style={s.detailAddress}>📍 {item.address}</Text> : null}
-                  {item.note ? <Text style={s.detailNote}>📝 {item.note}</Text> : null}
+                  {item.address ? <Text style={[s.detailAddress, { fontSize: fs(13) }]}>📍 {item.address}</Text> : null}
+                  {item.note ? <Text style={[s.detailNote, { fontSize: fs(13) }]}>📝 {item.note}</Text> : null}
 
                   {item.items.map((i, idx) => (
                     <View key={idx} style={s.itemRow}>
-                      <Text style={s.itemName}>{i.name}</Text>
-                      <Text style={s.itemQty}>{i.quantity} {i.unit}</Text>
+                      <Text style={[s.itemName, { fontSize: fs(14) }]}>{i.name}</Text>
+                      <Text style={[s.itemQty, { fontSize: fs(14) }]}>{i.quantity} {i.unit}</Text>
                     </View>
                   ))}
 
                   <View style={s.cardActions}>
-                    <Text style={s.totalAmount}>{item.totalAmount.toLocaleString('vi-VN')}đ</Text>
+                    <Text style={[s.totalAmount, { fontSize: fs(16) }]}>{item.totalAmount.toLocaleString('vi-VN')}đ</Text>
                     <TouchableOpacity onPress={() => copyBatch(item)} style={s.copyBtn}>
                       <ClipboardCopy color="#38bdf8" size={16} />
-                      <Text style={s.copyBtnText}>Copy Zalo</Text>
+                      <Text style={[s.copyBtnText, { fontSize: fs(13) }]}>Copy Zalo</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

@@ -14,6 +14,7 @@ import { Order, OrderStatus } from '@/types';
 import ErrorView from '@/components/ErrorView';
 import { formatDateTime } from '@/lib/formatDate';
 import { parseCustomerInfo } from '@/lib/parseCustomer';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; icon: React.ReactNode }> = {
   pending:    { label: 'Chờ xác nhận', color: '#f59e0b', icon: <Clock color="#f59e0b" size={16} /> },
@@ -38,6 +39,7 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const { fs } = useResponsive();
 
   async function fetchOrder() {
     if (!id) return;
@@ -99,21 +101,21 @@ export default function OrderDetailScreen() {
           <ArrowLeft color="#9ca3af" size={22} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>#{order.id.slice(-8).toUpperCase()}</Text>
-          <Text style={s.headerDate}>
+          <Text style={[s.headerTitle, { fontSize: fs(16) }]}>#{order.id.slice(-8).toUpperCase()}</Text>
+          <Text style={[s.headerDate, { fontSize: fs(12) }]}>
             {formatDateTime(order.created_at)}
           </Text>
         </View>
         <View style={[s.statusBadge, { backgroundColor: config.color + '22', borderColor: config.color }]}>
           {config.icon}
-          <Text style={[s.statusText, { color: config.color }]}>{config.label}</Text>
+          <Text style={[s.statusText, { color: config.color, fontSize: fs(12) }]}>{config.label}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
         {/* Customer info */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Khách hàng</Text>
+          <Text style={[s.sectionTitle, { fontSize: fs(13) }]}>Khách hàng</Text>
           <View style={s.infoCard}>
             <InfoRow icon={<User color="#9ca3af" size={15} />} text={customerName} />
             {customerPhone !== '—' && <InfoRow icon={<Phone color="#9ca3af" size={15} />} text={customerPhone} />}
@@ -123,14 +125,14 @@ export default function OrderDetailScreen() {
 
         {/* Order items */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Sản phẩm ({order.order_items.length} loại)</Text>
+          <Text style={[s.sectionTitle, { fontSize: fs(13) }]}>Sản phẩm ({order.order_items.length} loại)</Text>
           <View style={s.infoCard}>
             {order.order_items.map((item) => (
               <View key={item.id} style={s.itemRow}>
                 <Package color="#6b7280" size={14} />
-                <Text style={s.itemName} numberOfLines={1}>{item.products?.name ?? 'Sản phẩm đã xoá'}</Text>
-                <Text style={s.itemQty}>{item.quantity} {item.products?.unit ?? ''}</Text>
-                <Text style={s.itemPrice}>{(item.price_at_time * item.quantity).toLocaleString('vi-VN')}đ</Text>
+                <Text style={[s.itemName, { fontSize: fs(14) }]} numberOfLines={1}>{item.products?.name ?? 'Sản phẩm đã xoá'}</Text>
+                <Text style={[s.itemQty, { fontSize: fs(13) }]}>{item.quantity} {item.products?.unit ?? ''}</Text>
+                <Text style={[s.itemPrice, { fontSize: fs(13) }]}>{(item.price_at_time * item.quantity).toLocaleString('vi-VN')}đ</Text>
               </View>
             ))}
           </View>
@@ -138,21 +140,21 @@ export default function OrderDetailScreen() {
 
         {/* Payment summary */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Thanh toán</Text>
+          <Text style={[s.sectionTitle, { fontSize: fs(13) }]}>Thanh toán</Text>
           <View style={s.infoCard}>
             <View style={s.summaryRow}>
-              <Text style={s.summaryLabel}>Hình thức</Text>
-              <Text style={s.summaryValue}>{order.payment_method === 'cod' ? 'Tiền mặt (COD)' : 'Chuyển khoản'}</Text>
+              <Text style={[s.summaryLabel, { fontSize: fs(14) }]}>Hình thức</Text>
+              <Text style={[s.summaryValue, { fontSize: fs(14) }]}>{order.payment_method === 'cod' ? 'Tiền mặt (COD)' : 'Chuyển khoản'}</Text>
             </View>
             {totalWeight > 0 && (
               <View style={s.summaryRow}>
-                <Text style={s.summaryLabel}>Tổng kg</Text>
-                <Text style={[s.summaryValue, { color: '#a78bfa' }]}>{totalWeight.toFixed(1)} kg</Text>
+                <Text style={[s.summaryLabel, { fontSize: fs(14) }]}>Tổng kg</Text>
+                <Text style={[s.summaryValue, { color: '#a78bfa', fontSize: fs(14) }]}>{totalWeight.toFixed(1)} kg</Text>
               </View>
             )}
             <View style={[s.summaryRow, s.totalRow]}>
-              <Text style={s.totalLabel}>Tổng tiền</Text>
-              <Text style={s.totalValue}>{order.total_amount.toLocaleString('vi-VN')}đ</Text>
+              <Text style={[s.totalLabel, { fontSize: fs(16) }]}>Tổng tiền</Text>
+              <Text style={[s.totalValue, { fontSize: fs(20) }]}>{order.total_amount.toLocaleString('vi-VN')}đ</Text>
             </View>
           </View>
         </View>
@@ -160,9 +162,9 @@ export default function OrderDetailScreen() {
         {/* Note */}
         {order.note && (
           <View style={s.section}>
-            <Text style={s.sectionTitle}>Ghi chú</Text>
+            <Text style={[s.sectionTitle, { fontSize: fs(13) }]}>Ghi chú</Text>
             <View style={[s.infoCard, { padding: 12 }]}>
-              <Text style={s.noteText}>{order.note}</Text>
+              <Text style={[s.noteText, { fontSize: fs(14) }]}>{order.note}</Text>
             </View>
           </View>
         )}
@@ -170,7 +172,7 @@ export default function OrderDetailScreen() {
         {/* Actions */}
         {nextStatuses.length > 0 && (
           <View style={s.section}>
-            <Text style={s.sectionTitle}>Cập nhật trạng thái</Text>
+            <Text style={[s.sectionTitle, { fontSize: fs(13) }]}>Cập nhật trạng thái</Text>
             <View style={s.actionRow}>
               {nextStatuses.map((ns) => {
                 const nc = STATUS_CONFIG[ns];
@@ -182,7 +184,7 @@ export default function OrderDetailScreen() {
                     disabled={updating}
                   >
                     {updating ? <ActivityIndicator color={nc.color} size="small" /> : nc.icon}
-                    <Text style={[s.actionBtnText, { color: nc.color }]}>→ {nc.label}</Text>
+                    <Text style={[s.actionBtnText, { color: nc.color, fontSize: fs(15) }]}>→ {nc.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -195,10 +197,11 @@ export default function OrderDetailScreen() {
 }
 
 function InfoRow({ icon, text }: { icon: React.ReactNode; text: string }) {
+  const { fs } = useResponsive();
   return (
     <View style={s.infoRow}>
       {icon}
-      <Text style={s.infoText}>{text}</Text>
+      <Text style={[s.infoText, { fontSize: fs(14) }]}>{text}</Text>
     </View>
   );
 }

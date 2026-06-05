@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput, KeyboardAvoidingView,
-  Platform, ActivityIndicator, Alert,
+  Platform, ActivityIndicator, Alert, AppState, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -47,11 +47,18 @@ export default function ChatScreen() {
   // isFetching guard: prevent overlapping poll calls
   const isFetchingRef = useRef(false);
   const isMounted = useRef(true);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     isMounted.current = true;
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
     return () => {
       isMounted.current = false;
+      showSub.remove();
+      hideSub.remove();
     };
   }, []);
 
@@ -129,6 +136,7 @@ export default function ChatScreen() {
 
     async function poll() {
       if (!mounted) return;
+      if (AppState.currentState !== 'active') return;
       if (view === 'list') {
         await fetchConversations();
       } else {
@@ -139,9 +147,16 @@ export default function ChatScreen() {
     poll().finally(() => { if (mounted && loading) setLoading(false); });
     const timer = setInterval(poll, POLL_INTERVAL);
 
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        poll();
+      }
+    });
+
     return () => {
       mounted = false;
       clearInterval(timer);
+      subscription.remove();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, currentIdentifier]);
@@ -266,7 +281,7 @@ export default function ChatScreen() {
         />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={s.inputRow}>
+          <View style={[s.inputRow, !isKeyboardVisible && { paddingBottom: Platform.OS === 'ios' ? 70 : 62 }]}>
             <TextInput
               style={s.replyInput}
               value={replyText}

@@ -18,11 +18,11 @@ Tập hồ sơ này lưu trữ kế hoạch và tiến độ kiểm tra tương 
 | Module | Tác vụ chính | Trạng thái | Ghi chú |
 |---|---|---|---|
 | **Test 1: Auth & Login** | Sửa lỗi kẹt ô nhập liệu, kiểm tra Auth Guard, chuyển màn hình | ✅ Đã kiểm tra & Sửa | Đã sửa KeyboardAvoidingView chặn touch bằng ScrollView + undefined behavior trên Android |
-| **Test 2: Dashboard** | Responsive grid, nút Refresh, tải dữ liệu động từ Supabase | ✅ Đã kiểm tra | Thêm `paddingBottom: 100` để cuộn qua thanh tab, responsive grid hoạt động tốt trên cả tablet/phone |
-| **Test 3: Orders** | Mở rộng thẻ (collapsible), chuyển trạng thái, Xem chi tiết | ✅ Đã kiểm tra | Thiết kế lại thẻ đẹp mắt, tóm tắt món ăn & cân nặng luôn hiện, thêm `paddingBottom: 100` tránh bị che |
-| **Test 4: Products** | Bàn phím multiline, chọn Danh mục, validate, upload ảnh | ✅ Đã kiểm tra & Sửa | Đã sửa KeyboardAvoidingView chặn touch trong Modal trên Android, thêm `paddingBottom: 100` cho list |
-| **Test 5: Batch Prep** | Decimal Keyboard, validate kg, copy danh sách soạn hàng | ✅ Đã kiểm tra | Clipboard copy và decimal input ổn định, thêm `paddingBottom: 100` tránh che khuất |
-| **Test 6: Chat & Broadcast** | Chat realtime, đánh dấu đã đọc, gửi Broadcast | ✅ Đã kiểm tra & Sửa | Đã sửa KeyboardAvoidingView trong chat chi tiết trên Android, thêm `paddingBottom: 100` tránh che khuất |
+| **Test 2: Dashboard** | Responsive grid, nút Refresh, tải dữ liệu động từ Supabase | ✅ Đã kiểm tra & Sửa | Đã thêm cờ bảo vệ `isMounted` tránh memory leak + Thêm `paddingBottom: 100` để cuộn tránh che khuất |
+| **Test 3: Orders** | Mở rộng thẻ (collapsible), chuyển trạng thái, Xem chi tiết | ✅ Đã kiểm tra & Sửa | Tách riêng Realtime Channel khi mount và thêm `isMounted` guard để tránh warning, tóm tắt kg luôn hiện |
+| **Test 4: Products** | Bàn phím multiline, chọn Danh mục, validate, upload ảnh | ✅ Đã kiểm tra & Sửa | Đã thêm cờ bảo vệ `isMounted` khi upload ảnh và commitSave + Keyboard tránh che khuất |
+| **Test 5: Batch Prep** | Decimal Keyboard, validate kg, copy danh sách soạn hàng | ✅ Đã kiểm tra & Sửa | Đã thêm cờ bảo vệ `isMounted` tránh memory leak + decimal-pad và copy Clipboard ổn định |
+| **Test 6: Chat & Broadcast** | Chat realtime, đánh dấu đã đọc, gửi Broadcast | ✅ Đã kiểm tra & Sửa | Đã thêm cờ bảo vệ `isMounted` cho Chat và Broadcast + Tự ngắt chat polling khi app chạy ngầm |
 
 ---
 

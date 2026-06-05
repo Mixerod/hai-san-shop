@@ -5,12 +5,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronDown, ChevronUp, MapPin, Package, ExternalLink, Scale } from 'lucide-react-native';
 import { Order, OrderStatus } from '@/types';
 import { formatDateTime } from '@/lib/formatDate';
 import { parseCustomerInfo } from '@/lib/parseCustomer';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string }> = {
   pending:    { label: 'Chờ xác nhận', color: '#f59e0b' },
@@ -35,11 +37,13 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 interface Props {
   order: Order;
-  onUpdateStatus: (id: string, status: OrderStatus) => void;
+  onUpdateStatus: (id: string, status: OrderStatus) => Promise<void> | void;
 }
 
 function OrderCard({ order, onUpdateStatus }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const { fs } = useResponsive();
   const router = useRouter();
   const config = STATUS_CONFIG[order.status];
   const nextStatuses = NEXT_STATUSES[order.status] ?? [];
@@ -60,22 +64,32 @@ function OrderCard({ order, onUpdateStatus }: Props) {
     .map(item => `${item.products?.name ?? 'SP'} (${item.quantity}${item.products?.unit ?? ''})`)
     .join(', ');
 
+  async function handleUpdateStatus(status: OrderStatus) {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      await onUpdateStatus(order.id, status);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
   return (
     <View style={styles.card}>
       {/* Header Row (Always Visible) */}
       <TouchableOpacity onPress={() => setExpanded(!expanded)} style={styles.cardHeader}>
         <View style={styles.headerLeft}>
-          <Text style={styles.customerName}>{customerName}</Text>
+          <Text style={[styles.customerName, { fontSize: fs(16) }]}>{customerName}</Text>
           <View style={styles.metaRow}>
             {customerPhone !== '—' && (
-              <Text style={styles.customerPhone}>📞 {customerPhone}</Text>
+              <Text style={[styles.customerPhone, { fontSize: fs(13) }]}>📞 {customerPhone}</Text>
             )}
-            <Text style={styles.orderDate}>{formattedDate}</Text>
+            <Text style={[styles.orderDate, { fontSize: fs(12) }]}>{formattedDate}</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
           <View style={[styles.statusBadge, { backgroundColor: config.color + '22', borderColor: config.color }]}>
-            <Text style={[styles.statusText, { color: config.color }]}>{config.label}</Text>
+            <Text style={[styles.statusText, { color: config.color, fontSize: fs(12) }]}>{config.label}</Text>
           </View>
           {expanded ? <ChevronUp color="#9ca3af" size={18} /> : <ChevronDown color="#9ca3af" size={18} />}
         </View>
@@ -85,12 +99,12 @@ function OrderCard({ order, onUpdateStatus }: Props) {
       <View style={styles.summaryContainer}>
         <View style={styles.summaryLeft}>
           <Package color="#9ca3af" size={14} style={styles.summaryIcon} />
-          <Text style={styles.summaryText} numberOfLines={2}>{itemsSummary}</Text>
+          <Text style={[styles.summaryText, { fontSize: fs(13) }]} numberOfLines={2}>{itemsSummary}</Text>
         </View>
         {totalWeight > 0 && (
           <View style={styles.weightBadge}>
             <Scale color="#a78bfa" size={12} />
-            <Text style={styles.weightText}>{totalWeight.toFixed(1)} kg</Text>
+            <Text style={[styles.weightText, { fontSize: fs(12) }]}>{totalWeight.toFixed(1)} kg</Text>
           </View>
         )}
       </View>
@@ -98,13 +112,13 @@ function OrderCard({ order, onUpdateStatus }: Props) {
       {/* Price & Payment info (Always Visible) */}
       <View style={styles.priceRow}>
         <View style={styles.priceLeft}>
-          <Text style={styles.amountLabel}>Tổng:</Text>
-          <Text style={styles.amount}>{order.total_amount.toLocaleString('vi-VN')}đ</Text>
+          <Text style={[styles.amountLabel, { fontSize: fs(12) }]}>Tổng:</Text>
+          <Text style={[styles.amount, { fontSize: fs(16) }]}>{order.total_amount.toLocaleString('vi-VN')}đ</Text>
         </View>
-        <Text style={styles.paymentMethod}>
+        <Text style={[styles.paymentMethod, { fontSize: fs(12) }]}>
           💳 {PAYMENT_LABEL[order.payment_method] ?? order.payment_method}
         </Text>
-        <Text style={styles.orderIdMuted}>#{order.id.slice(-6).toUpperCase()}</Text>
+        <Text style={[styles.orderIdMuted, { fontSize: fs(11) }]}>#{order.id.slice(-6).toUpperCase()}</Text>
       </View>
 
       {/* Expanded Details */}
@@ -113,23 +127,23 @@ function OrderCard({ order, onUpdateStatus }: Props) {
           {order.profiles?.address ? (
             <View style={styles.detailRow}>
               <MapPin color="#9ca3af" size={14} style={{ marginTop: 2 }} />
-              <Text style={styles.detailText}>{order.profiles.address}</Text>
+              <Text style={[styles.detailText, { fontSize: fs(13) }]}>{order.profiles.address}</Text>
             </View>
           ) : null}
           {order.note ? (
             <View style={styles.noteBox}>
-              <Text style={styles.noteText}>📝 {order.note}</Text>
+              <Text style={[styles.noteText, { fontSize: fs(13) }]}>📝 {order.note}</Text>
             </View>
           ) : null}
 
-          <Text style={styles.breakdownTitle}>Chi tiết các món:</Text>
+          <Text style={[styles.breakdownTitle, { fontSize: fs(13) }]}>Chi tiết các món:</Text>
           {order.order_items.map((item) => (
             <View key={item.id} style={styles.breakdownItem}>
-              <Text style={styles.breakdownName}>{item.products?.name ?? 'Sản phẩm đã xoá'}</Text>
-              <Text style={styles.breakdownQty}>
+              <Text style={[styles.breakdownName, { fontSize: fs(13) }]}>{item.products?.name ?? 'Sản phẩm đã xoá'}</Text>
+              <Text style={[styles.breakdownQty, { fontSize: fs(13) }]}>
                 {item.quantity} {item.products?.unit ?? ''}
               </Text>
-              <Text style={styles.breakdownPrice}>
+              <Text style={[styles.breakdownPrice, { fontSize: fs(13) }]}>
                 {(item.price_at_time * item.quantity).toLocaleString('vi-VN')}đ
               </Text>
             </View>
@@ -137,21 +151,27 @@ function OrderCard({ order, onUpdateStatus }: Props) {
 
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={styles.detailBtn}
+              style={[styles.detailBtn, { opacity: updating ? 0.6 : 1 }]}
               onPress={() => router.push({ pathname: '/order-detail', params: { id: order.id } })}
+              disabled={updating}
             >
               <ExternalLink color="#9ca3af" size={14} />
-              <Text style={styles.detailBtnText}>Chi tiết</Text>
+              <Text style={[styles.detailBtnText, { fontSize: fs(13) }]}>Chi tiết</Text>
             </TouchableOpacity>
             {nextStatuses.map((s) => (
               <TouchableOpacity
                 key={s}
-                style={[styles.actionBtn, { borderColor: STATUS_CONFIG[s].color }]}
-                onPress={() => onUpdateStatus(order.id, s)}
+                style={[styles.actionBtn, { borderColor: STATUS_CONFIG[s].color }, updating && { opacity: 0.5 }]}
+                onPress={() => handleUpdateStatus(s)}
+                disabled={updating}
               >
-                <Text style={[styles.actionBtnText, { color: STATUS_CONFIG[s].color }]}>
-                  → {STATUS_CONFIG[s].label}
-                </Text>
+                {updating ? (
+                  <ActivityIndicator size="small" color={STATUS_CONFIG[s].color} />
+                ) : (
+                  <Text style={[styles.actionBtnText, { color: STATUS_CONFIG[s].color, fontSize: fs(13) }]}>
+                    → {STATUS_CONFIG[s].label}
+                  </Text>
+                )}
               </TouchableOpacity>
             ))}
           </View>

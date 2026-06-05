@@ -32,3 +32,14 @@
    * Giờ đây, màn hình Chat hoạt động tuyệt đối an toàn và không còn rủi ro gây hao tổn RAM khi người dùng chuyển tab nhanh.
 
 3. **Kiểm thử biên dịch**: Chạy `npx tsc --noEmit` hoàn thành không lỗi.
+
+### 🛠️ Rà soát che khuất Bottom Tab Bar và bàn phím (Phiên C)
+1. **Lỗi che khuất ô chat chi tiết**:
+   - Khi hiển thị giao diện chat chi tiết (`view === 'detail'`), phần thanh Bottom Tab Bar vẫn còn hiển thị ở dưới cùng. Khi bàn phím đóng, thanh tab bar này che mất ô TextInput gửi tin phản hồi.
+   - Khi dùng `KeyboardAvoidingView`, nếu thêm `paddingBottom` cố định thì khi bàn phím mở lên, ô chat sẽ bị đẩy quá cao gây lãng phí khoảng trống.
+2. **Khắc phục**:
+   - Tích hợp bộ lắng nghe Keyboard di động (`Keyboard.addListener`) để theo dõi trạng thái ẩn/hiện của bàn phím.
+   - Thêm `paddingBottom` động (62px-70px) cho `inputRow` **chỉ khi bàn phím đóng** để đẩy ô nhập liệu lên trên Bottom Tab Bar. Khi bàn phím mở, paddingBottom được đặt về bình thường giúp ô chat bám sát mép bàn phím hoàn hảo.
+3. **Kết quả**:
+   - Giao diện chat hoạt động chuyên nghiệp, mượt mà và không còn bị che khuất trong mọi trạng thái bàn phím.
+

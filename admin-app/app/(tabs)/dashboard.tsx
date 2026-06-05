@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, memo, useRef } from 'react';
 import {
   View,
   Text,
@@ -74,6 +74,14 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [period, setPeriod] = useState<Period>('month');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   async function fetchStats() {
     const periodStart = getPeriodStart(period);
@@ -87,6 +95,7 @@ export default function DashboardScreen() {
     }
 
     const { data: orders, error } = await query;
+    if (!isMounted.current) return;
     if (error) { setFetchError('Không thể tải thống kê. Kiểm tra kết nối mạng.'); return; }
     if (!orders) return;
     setFetchError(null);
@@ -119,13 +128,13 @@ export default function DashboardScreen() {
   }
 
   useEffect(() => {
-    fetchStats().finally(() => setLoading(false));
+    fetchStats().finally(() => { if (isMounted.current) setLoading(false); });
   }, [period]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchStats();
-    setRefreshing(false);
+    if (isMounted.current) setRefreshing(false);
   };
 
   if (loading) {
