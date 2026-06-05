@@ -2,7 +2,7 @@
 
 ## 📌 Tổng quan các Phase
 - [x] **Phase 24: Responsive Layout Polish** (Hoàn thành)
-- [ ] **Phase 25: Code Cleanup & Testing** (Đang thực hiện)
+- [x] **Phase 25: Code Cleanup & Testing** (Hoàn thành)
 
 ---
 
@@ -40,10 +40,10 @@
 - [x] 4. Áp dụng hook `fs()` trong `app/customers.tsx` và `app/broadcast.tsx`
 - [x] 5. Chạy TypeScript check, commit và push code lên remote branch
 
-### 🔄 Phase 25: Code Cleanup & Testing (Đang thực hiện)
+### ✅ Phase 25: Code Cleanup & Testing (Hoàn thành)
 - [x] 1. Xoá file `components/AdminHeader.tsx` (dead code) sau khi grep check
 - [x] 2. Fix unsafe `(Constants as any)` tại `lib/notifications.ts`
 - [x] 3. Kiểm tra và xoá `isSmallPhone` không sử dụng trong `app/(tabs)/dashboard.tsx`
 - [x] 4. Kiểm tra null guard `row.title?.startsWith(...)` trong `app/(tabs)/chat.tsx`
 - [x] 5. Kiểm tra keyExtractor trong các FlatList
-- [ ] 6. Chạy TypeScript check, commit và push code lên remote branch
+- [x] 6. Chạy TypeScript check, commit và push code lên remote branch
