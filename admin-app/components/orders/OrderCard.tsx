@@ -4,11 +4,13 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronDown, ChevronUp, User, Phone, MapPin, Package, ExternalLink } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, MapPin, Package, ExternalLink, Scale } from 'lucide-react-native';
 import { Order, OrderStatus } from '@/types';
 import { formatDateTime } from '@/lib/formatDate';
+import { parseCustomerInfo } from '@/lib/parseCustomer';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string }> = {
   pending:    { label: 'Chờ xác nhận', color: '#f59e0b' },
@@ -48,43 +50,69 @@ function OrderCard({ order, onUpdateStatus }: Props) {
 
   const formattedDate = formatDateTime(order.created_at);
 
+  const { name: customerName, phone: customerPhone } = parseCustomerInfo(
+    order.note,
+    order.profiles?.full_name ?? null,
+    order.profiles?.phone ?? null
+  );
+
+  const itemsSummary = order.order_items
+    .map(item => `${item.products?.name ?? 'SP'} (${item.quantity}${item.products?.unit ?? ''})`)
+    .join(', ');
+
   return (
     <View style={styles.card}>
-      <TouchableOpacity onPress={() => setExpanded(!expanded)} style={styles.topRow}>
-        <View>
-          <Text style={styles.orderId}>#{order.id.slice(-6).toUpperCase()}</Text>
-          <Text style={styles.orderDate}>{formattedDate}</Text>
+      {/* Header Row (Always Visible) */}
+      <TouchableOpacity onPress={() => setExpanded(!expanded)} style={styles.cardHeader}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.customerName}>{customerName}</Text>
+          <View style={styles.metaRow}>
+            {customerPhone !== '—' && (
+              <Text style={styles.customerPhone}>📞 {customerPhone}</Text>
+            )}
+            <Text style={styles.orderDate}>{formattedDate}</Text>
+          </View>
         </View>
-        <View style={styles.topRight}>
+        <View style={styles.headerRight}>
           <View style={[styles.statusBadge, { backgroundColor: config.color + '22', borderColor: config.color }]}>
             <Text style={[styles.statusText, { color: config.color }]}>{config.label}</Text>
           </View>
-          {expanded ? <ChevronUp color="#6b7280" size={18} /> : <ChevronDown color="#6b7280" size={18} />}
+          {expanded ? <ChevronUp color="#9ca3af" size={18} /> : <ChevronDown color="#9ca3af" size={18} />}
         </View>
       </TouchableOpacity>
 
-      <View style={styles.customerRow}>
-        <User color="#9ca3af" size={14} />
-        <Text style={styles.customerName}>{order.profiles?.full_name ?? 'Khách vãng lai'}</Text>
-        <Phone color="#9ca3af" size={14} />
-        <Text style={styles.customerPhone}>{order.profiles?.phone ?? '—'}</Text>
-      </View>
-
-      <View style={styles.amountRow}>
-        <Text style={styles.amount}>
-          {order.total_amount.toLocaleString('vi-VN')}đ
-        </Text>
+      {/* Items Summary & Total Weight (Always Visible) */}
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryLeft}>
+          <Package color="#9ca3af" size={14} style={styles.summaryIcon} />
+          <Text style={styles.summaryText} numberOfLines={2}>{itemsSummary}</Text>
+        </View>
         {totalWeight > 0 && (
-          <Text style={styles.weight}>{totalWeight.toFixed(1)} kg</Text>
+          <View style={styles.weightBadge}>
+            <Scale color="#a78bfa" size={12} />
+            <Text style={styles.weightText}>{totalWeight.toFixed(1)} kg</Text>
+          </View>
         )}
-        <Text style={styles.payment}>{PAYMENT_LABEL[order.payment_method] ?? order.payment_method}</Text>
       </View>
 
+      {/* Price & Payment info (Always Visible) */}
+      <View style={styles.priceRow}>
+        <View style={styles.priceLeft}>
+          <Text style={styles.amountLabel}>Tổng:</Text>
+          <Text style={styles.amount}>{order.total_amount.toLocaleString('vi-VN')}đ</Text>
+        </View>
+        <Text style={styles.paymentMethod}>
+          💳 {PAYMENT_LABEL[order.payment_method] ?? order.payment_method}
+        </Text>
+        <Text style={styles.orderIdMuted}>#{order.id.slice(-6).toUpperCase()}</Text>
+      </View>
+
+      {/* Expanded Details */}
       {expanded && (
-        <View style={styles.detail}>
+        <View style={styles.detailSection}>
           {order.profiles?.address ? (
             <View style={styles.detailRow}>
-              <MapPin color="#9ca3af" size={14} />
+              <MapPin color="#9ca3af" size={14} style={{ marginTop: 2 }} />
               <Text style={styles.detailText}>{order.profiles.address}</Text>
             </View>
           ) : null}
@@ -94,15 +122,14 @@ function OrderCard({ order, onUpdateStatus }: Props) {
             </View>
           ) : null}
 
-          <Text style={styles.itemsTitle}>Sản phẩm:</Text>
+          <Text style={styles.breakdownTitle}>Chi tiết các món:</Text>
           {order.order_items.map((item) => (
-            <View key={item.id} style={styles.item}>
-              <Package color="#6b7280" size={14} />
-              <Text style={styles.itemName}>{item.products?.name ?? 'Sản phẩm đã xoá'}</Text>
-              <Text style={styles.itemQty}>
+            <View key={item.id} style={styles.breakdownItem}>
+              <Text style={styles.breakdownName}>{item.products?.name ?? 'Sản phẩm đã xoá'}</Text>
+              <Text style={styles.breakdownQty}>
                 {item.quantity} {item.products?.unit ?? ''}
               </Text>
-              <Text style={styles.itemPrice}>
+              <Text style={styles.breakdownPrice}>
                 {(item.price_at_time * item.quantity).toLocaleString('vi-VN')}đ
               </Text>
             </View>
@@ -113,7 +140,7 @@ function OrderCard({ order, onUpdateStatus }: Props) {
               style={styles.detailBtn}
               onPress={() => router.push({ pathname: '/order-detail', params: { id: order.id } })}
             >
-              <ExternalLink color="#6b7280" size={14} />
+              <ExternalLink color="#9ca3af" size={14} />
               <Text style={styles.detailBtnText}>Chi tiết</Text>
             </TouchableOpacity>
             {nextStatuses.map((s) => (
@@ -142,35 +169,206 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1f2937',
-    padding: 12,
+    padding: 14,
     marginBottom: 8,
   },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  orderId: { color: '#e5e7eb', fontSize: 14, fontWeight: '600' },
-  orderDate: { color: '#6b7280', fontSize: 12, marginTop: 2 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  customerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  customerName: { color: '#d1d5db', fontSize: 14, flex: 1 },
-  customerPhone: { color: '#9ca3af', fontSize: 13 },
-  amountRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  amount: { color: '#38bdf8', fontSize: 15, fontWeight: '700' },
-  weight: { color: '#a78bfa', fontSize: 13 },
-  payment: { color: '#6b7280', fontSize: 12, marginLeft: 'auto' },
-  detail: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#1f2937', paddingTop: 12, gap: 8 },
-  detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  detailText: { color: '#9ca3af', fontSize: 13, flex: 1 },
-  noteBox: { backgroundColor: '#1f2937', borderRadius: 8, padding: 8 },
-  noteText: { color: '#d1d5db', fontSize: 13 },
-  itemsTitle: { color: '#9ca3af', fontSize: 13, fontWeight: '600' },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  itemName: { color: '#d1d5db', fontSize: 13, flex: 1 },
-  itemQty: { color: '#a78bfa', fontSize: 13 },
-  itemPrice: { color: '#38bdf8', fontSize: 13 },
-  actionRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 },
-  detailBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#374151' },
-  detailBtnText: { color: '#6b7280', fontSize: 13 },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  actionBtnText: { fontSize: 13, fontWeight: '500' },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  customerName: {
+    color: '#f9fafb',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  customerPhone: {
+    color: '#9ca3af',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  orderDate: {
+    color: '#6b7280',
+    fontSize: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1f2937',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 10,
+    gap: 10,
+  },
+  summaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryIcon: {
+    marginRight: 6,
+  },
+  summaryText: {
+    color: '#d1d5db',
+    fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
+  },
+  weightBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#a78bfa22',
+    borderColor: '#a78bfa44',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  weightText: {
+    color: '#a78bfa',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  priceLeft: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  amountLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  amount: {
+    color: '#38bdf8',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  paymentMethod: {
+    color: '#6b7280',
+    fontSize: 12,
+  },
+  orderIdMuted: {
+    color: '#374151',
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  detailSection: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#1f2937',
+    paddingTop: 12,
+    gap: 10,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  detailText: {
+    color: '#9ca3af',
+    fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
+  },
+  noteBox: {
+    backgroundColor: '#1f2937',
+    borderRadius: 8,
+    padding: 10,
+  },
+  noteText: {
+    color: '#d1d5db',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  breakdownTitle: {
+    color: '#9ca3af',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 3,
+  },
+  breakdownName: {
+    color: '#d1d5db',
+    fontSize: 13,
+    flex: 1,
+  },
+  breakdownQty: {
+    color: '#a78bfa',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  breakdownPrice: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 6,
+  },
+  detailBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  detailBtnText: {
+    color: '#9ca3af',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  actionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  actionBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
 });

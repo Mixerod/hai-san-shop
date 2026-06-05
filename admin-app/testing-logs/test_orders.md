@@ -18,4 +18,20 @@
 ---
 
 ## 📝 Nhật ký Kiểm thử & Nhật ký Sửa lỗi
-*(Tiến độ kiểm thử sẽ được cập nhật tại đây khi tiến hành chạy test)*
+
+### 🛠️ Cải tiến giao diện và Đọc thông tin ghi chú khách hàng
+1. **Phân tích yêu cầu**: 
+   * Trực tiếp đọc thông tin Tên & Số điện thoại khách từ Ghi chú (`order.note`), do khách mua hàng vãng lai thường nhập thông tin giao hàng tại ghi chú này (định dạng `Tên: [tên]\nSĐT: [sdt]`).
+   * Ẩn bớt độ nổi bật của mã đơn hàng dạng `#31c803` vì không có nhiều ý nghĩa trực quan với quản lý.
+   * Hiển thị danh sách sản phẩm và tổng cân nặng (kg) **luôn luôn hiện** (không cần phải nhấn mở rộng thẻ) để admin xem nhanh đơn hàng gồm những gì.
+
+2. **Các sửa đổi đã thực hiện**:
+   * Tạo tệp helper `lib/parseCustomer.ts` chứa hàm `parseCustomerInfo` dùng Regex tách tên & SĐT từ ghi chú chính xác.
+   * Áp dụng helper này vào cả `OrderCard.tsx` và `order-detail.tsx`.
+   * **Thiết kế lại giao diện thẻ đơn hàng (`OrderCard`)**:
+     * Tiêu đề hiển thị to và rõ **Tên khách hàng** + **SĐT** + **Ngày giờ đặt**.
+     * Ở giữa hiển thị hộp tóm tắt: **Biểu tượng gói hàng 📦** kèm theo danh sách sản phẩm đặt (ví dụ: `Cá bớp (2kg), Tôm sú (1kg)`) và **Cân nặng (kg)** được tô màu nổi bật bên cạnh.
+     * Dưới cùng hiển thị **Tổng tiền** to rõ màu xanh dương, **Hình thức thanh toán**, và góc phải là mã đơn hàng `#ID` nhỏ màu mờ.
+     * Khi nhấn mở rộng thẻ chỉ hiển thị địa chỉ chi tiết, ghi chú thô, bảng giá từng món và nút cập nhật trạng thái.
+
+3. **Kiểm thử biên dịch**: Chạy `npx tsc --noEmit` thành công 100% không có lỗi.

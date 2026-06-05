@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { Order, OrderStatus } from '@/types';
 import ErrorView from '@/components/ErrorView';
 import { formatDateTime } from '@/lib/formatDate';
+import { parseCustomerInfo } from '@/lib/parseCustomer';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; icon: React.ReactNode }> = {
   pending:    { label: 'Chờ xác nhận', color: '#f59e0b', icon: <Clock color="#f59e0b" size={16} /> },
@@ -85,6 +86,12 @@ export default function OrderDetailScreen() {
     .filter(i => i.products?.unit === 'kg')
     .reduce((sum, i) => sum + i.quantity, 0);
 
+  const { name: customerName, phone: customerPhone } = parseCustomerInfo(
+    order.note,
+    order.profiles?.full_name ?? null,
+    order.profiles?.phone ?? null
+  );
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
@@ -108,8 +115,8 @@ export default function OrderDetailScreen() {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Khách hàng</Text>
           <View style={s.infoCard}>
-            <InfoRow icon={<User color="#9ca3af" size={15} />} text={order.profiles?.full_name ?? 'Khách vãng lai'} />
-            {order.profiles?.phone && <InfoRow icon={<Phone color="#9ca3af" size={15} />} text={order.profiles.phone} />}
+            <InfoRow icon={<User color="#9ca3af" size={15} />} text={customerName} />
+            {customerPhone !== '—' && <InfoRow icon={<Phone color="#9ca3af" size={15} />} text={customerPhone} />}
             {order.profiles?.address && <InfoRow icon={<MapPin color="#9ca3af" size={15} />} text={order.profiles.address} />}
           </View>
         </View>
