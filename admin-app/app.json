@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Hải Sản Admin",
+    "slug": "hai-san-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "hai-san-admin",
+    "plugins": [
+      "expo-router",
+      ["expo-notifications", { "icon": "./assets/icon.png", "color": "#0f172a", "sounds": [] }]
+    ],
+    "android": {
+      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#0f172a" },
+      "package": "com.haisanshop.admin",
+      "permissions": ["RECEIVE_BOOT_COMPLETED"]
+    },
+    "ios": { "supportsTablet": false, "bundleIdentifier": "com.haisanshop.admin" },
+    "web": { "bundler": "metro" },
+    "experiments": { "typedRoutes": true }
+  }
+}
