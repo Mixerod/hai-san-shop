@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput, Switch, Alert, ActivityIndicator, Modal, ScrollView,
   KeyboardAvoidingView, Platform, Image,
+  type TextInputProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -342,7 +343,7 @@ export default function ProductsScreen() {
 
 function FormField({ label, value, onChangeText, multiline, keyboardType }: {
   label: string; value: string; onChangeText: (v: string) => void;
-  multiline?: boolean; keyboardType?: string;
+  multiline?: boolean; keyboardType?: TextInputProps['keyboardType'];
 }) {
   return (
     <View style={{ marginBottom: 14 }}>
@@ -352,7 +353,7 @@ function FormField({ label, value, onChangeText, multiline, keyboardType }: {
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
-        keyboardType={keyboardType as any ?? 'default'}
+        keyboardType={keyboardType ?? 'default'}
         placeholderTextColor="#4b5563"
       />
     </View>

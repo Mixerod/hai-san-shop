@@ -94,8 +94,9 @@ export default function DashboardScreen() {
     const todayStart = getPeriodStart('today')!;
     const todayOrders = orders.filter(o => o.created_at >= todayStart);
 
+    type OrderRow = typeof orders[number] & { profiles: { phone: string | null } | null };
     const uniquePhones = new Set(
-      orders.map(o => (o.profiles as any)?.phone).filter(Boolean)
+      (orders as OrderRow[]).map(o => o.profiles?.phone).filter(Boolean)
     );
 
     setStats({
