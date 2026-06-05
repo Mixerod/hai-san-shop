@@ -34,4 +34,8 @@
      * Dưới cùng hiển thị **Tổng tiền** to rõ màu xanh dương, **Hình thức thanh toán**, và góc phải là mã đơn hàng `#ID` nhỏ màu mờ.
      * Khi nhấn mở rộng thẻ chỉ hiển thị địa chỉ chi tiết, ghi chú thô, bảng giá từng món và nút cập nhật trạng thái.
 
-3. **Kiểm thử biên dịch**: Chạy `npx tsc --noEmit` thành công 100% không có lỗi.
+3. **Tối ưu hóa Supabase Realtime & Tránh rò rỉ bộ nhớ (Memory Leak)**:
+   * **Tách biệt Realtime Subscription**: Trước đó, mỗi khi admin bấm chuyển tab trạng thái lọc (All, Pending, Confirmed...), component lại đăng ký lại (re-subscribe) một Realtime Channel mới có cùng tên, làm ngốn băng thông và có nguy cơ xung đột kết nối. Tôi đã tách subscription chỉ chạy duy nhất **1 lần khi Mount**, còn tab filter chỉ gọi hàm `fetchOrders` bình thường.
+   * **Thêm `isMounted` Ref Guard**: Tương tự như Chat, đã cài đặt bộ bảo vệ `isMounted` ref để ngắt toàn bộ lệnh gọi `setState` nếu admin thoát tab hoặc chuyển màn hình nhanh trước khi Supabase phản hồi dữ liệu.
+
+4. **Kiểm thử biên dịch**: Chạy `npx tsc --noEmit` thành công 100% không có lỗi.

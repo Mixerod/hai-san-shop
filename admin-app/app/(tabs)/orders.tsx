@@ -25,6 +25,14 @@ export default function OrdersScreen() {
   const [search, setSearch] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const channelId = useRef(`orders-${Math.random().toString(36).slice(2)}`);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   async function fetchOrders() {
     let query = supabase
@@ -37,6 +45,7 @@ export default function OrdersScreen() {
     }
 
     const { data, error } = await query;
+    if (!isMounted.current) return;
     if (error) {
       setFetchError('Không thể tải đơn hàng. Kiểm tra kết nối mạng.');
     } else if (data) {
@@ -46,22 +55,24 @@ export default function OrdersScreen() {
   }
 
   useEffect(() => {
-    fetchOrders().finally(() => setLoading(false));
+    fetchOrders().finally(() => { if (isMounted.current) setLoading(false); });
+  }, [filterStatus]);
 
+  useEffect(() => {
     const channel = supabase
       .channel(channelId.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
+        if (isMounted.current) fetchOrders();
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [filterStatus]);
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchOrders();
-    setRefreshing(false);
+    if (isMounted.current) setRefreshing(false);
   }, [filterStatus]);
 
   const debouncedSearch = useDebounce(search);
@@ -81,7 +92,7 @@ export default function OrdersScreen() {
       .update({ status: newStatus })
       .eq('id', orderId);
     if (error) Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
-    else fetchOrders();
+    else if (isMounted.current) fetchOrders();
   }
 
   if (loading) {

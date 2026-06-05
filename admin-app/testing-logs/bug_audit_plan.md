@@ -42,5 +42,5 @@ Tài liệu này phân tích các lỗi tiềm ẩn từ phổ biến, trung bì
 
 * **Phiên 1: Rà soát & Sửa lỗi Giao diện (UI/Layout & Che khuất)** -> *Hoàn thành*.
 * **Phiên 2: Rà soát Memory Leaks & Polling Cleanups (Chat & Dashboard)** -> *Hoàn thành*.
-* **Phiên 3: Rà soát Supabase Realtime Channels & Network Timeout Edge-Cases** -> *Sẽ lên lịch tiếp theo*.
+* **Phiên 3: Rà soát Supabase Realtime Channels & Network Timeout Edge-Cases** -> *Hoàn thành*.
 * **Phiên 4: Rà soát AsyncStorage & Trạng thái chạy ngầm (App Background state)** -> *Sẽ lên lịch cuối cùng*.
