@@ -54,8 +54,8 @@ Phase 1 (Setup)
 ```
 
 ## Status Checklist
-- [ ] **Phase 1** — Setup & Cấu trúc dự án → `PHASE_1_SETUP.md`
-- [ ] **Phase 2** — Authentication → `PHASE_2_AUTH.md`
+- [x] **Phase 1** — Setup & Cấu trúc dự án → `PHASE_1_SETUP.md` ✅
+- [x] **Phase 2** — Authentication → `PHASE_2_AUTH.md` ✅
 - [ ] **Phase 3** — Quản lý Đơn hàng → `PHASE_3_ORDERS.md`
 - [ ] **Phase 4** — Push Notifications → `PHASE_4_PUSH_NOTIF.md`
 - [ ] **Phase 5** — Dashboard & Thống kê → `PHASE_5_DASHBOARD.md`
