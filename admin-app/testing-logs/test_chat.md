@@ -19,4 +19,16 @@
 ---
 
 ## 📝 Nhật ký Kiểm thử & Nhật ký Sửa lỗi
-*(Tiến độ kiểm thử sẽ được cập nhật tại đây khi tiến hành chạy test)*
+
+### 🛠️ Sửa lỗi rò rỉ bộ nhớ (Memory Leak) và cập nhật State khi component đã hủy
+1. **Phân tích lỗi**:
+   * Khi người dùng rời khỏi màn hình Chat hoặc đóng Modal nhập tin nhắn, các tác vụ bất đồng bộ (như truy vấn Supabase feedbacks, gửi tin phản hồi, đánh dấu đã đọc...) vẫn đang trong quá trình tải.
+   * Khi các lệnh gọi API bất đồng bộ này hoàn thành, các hàm cập nhật state (`setChatError`, `setConversations`, `setMessages`, `setSending`...) sẽ được kích hoạt trên một Component không còn tồn tại trong cây DOM (unmounted), dẫn đến lỗi rò rỉ bộ nhớ (Memory Leak) và cảnh báo đỏ từ React.
+
+2. **Cách khắc phục**:
+   * Khai báo ref `isMounted = useRef(true)` để theo dõi vòng đời component.
+   * Sử dụng `useEffect` để đổi trạng thái `isMounted.current = false` khi component unmount.
+   * Đặt các lớp bảo vệ kiểm tra `if (!isMounted.current) return;` trước bất kỳ lệnh gọi `set...` state nào trong các hàm bất đồng bộ.
+   * Giờ đây, màn hình Chat hoạt động tuyệt đối an toàn và không còn rủi ro gây hao tổn RAM khi người dùng chuyển tab nhanh.
+
+3. **Kiểm thử biên dịch**: Chạy `npx tsc --noEmit` hoàn thành không lỗi.

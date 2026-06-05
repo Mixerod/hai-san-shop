@@ -46,6 +46,14 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList>(null);
   // isFetching guard: prevent overlapping poll calls
   const isFetchingRef = useRef(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // ─── Fetch functions ──────────────────────────────────────────────────────
 
@@ -58,6 +66,7 @@ export default function ChatScreen() {
         .select('title, content, rating, is_read, created_at')
         .order('created_at', { ascending: false });
 
+      if (!isMounted.current) return;
       if (error) { setChatError('Không thể tải tin nhắn.'); return; }
       if (!data) return;
 
@@ -97,6 +106,8 @@ export default function ChatScreen() {
         .select('*')
         .or(`title.eq.${identifier},title.eq.${ADMIN_PREFIX}${identifier}`)
         .order('created_at', { ascending: true });
+      
+      if (!isMounted.current) return;
       if (error || !data) {
         setChatError('Không thể tải tin nhắn.');
         return;
@@ -161,7 +172,7 @@ export default function ChatScreen() {
       .update({ is_read: true })
       .eq('title', identifier)
       .eq('is_read', false);
-    if (!error) await fetchConversations();
+    if (!error && isMounted.current) await fetchConversations();
   }
 
   async function sendReply() {
@@ -172,6 +183,8 @@ export default function ChatScreen() {
       content: replyText.trim(),
       is_read: true,
     });
+    
+    if (!isMounted.current) return;
     if (!error) {
       setReplyText('');
       await fetchMessages(currentIdentifier);
@@ -192,7 +205,7 @@ export default function ChatScreen() {
             .delete()
             .or(`title.eq.${identifier},title.eq.${ADMIN_PREFIX}${identifier}`);
           if (error) Alert.alert('Lỗi', 'Không thể xoá hội thoại');
-          else await fetchConversations();
+          else if (isMounted.current) await fetchConversations();
         },
       },
     ]);
