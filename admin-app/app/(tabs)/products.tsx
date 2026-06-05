@@ -282,7 +282,7 @@ export default function ProductsScreen() {
 
       {/* Add/Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <SafeAreaView style={s.modal} edges={['top', 'bottom']}>
             <View style={s.modalHeader}>
               <TouchableOpacity onPress={() => setShowModal(false)}>

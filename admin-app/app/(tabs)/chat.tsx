@@ -252,7 +252,7 @@ export default function ChatScreen() {
           )}
         />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.inputRow}>
             <TextInput
               style={s.replyInput}
