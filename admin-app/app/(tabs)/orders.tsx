@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
   },
-  listContent: { padding: 12, paddingTop: 0, gap: 8 },
+  listContent: { padding: 12, paddingTop: 0, paddingBottom: 100, gap: 8 },
   empty: { padding: 48, alignItems: 'center' },
   emptyText: { color: '#6b7280', fontSize: 16 },
 });

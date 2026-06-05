@@ -363,7 +363,7 @@ const s = StyleSheet.create({
   summaryName: { color: '#d1d5db', fontSize: 13, flex: 1 },
   summaryQty: { color: '#38bdf8', fontSize: 13, fontWeight: '600', minWidth: 70, textAlign: 'right' },
   summaryCount: { color: '#6b7280', fontSize: 12, minWidth: 50, textAlign: 'right' },
-  list: { padding: 12, gap: 8 },
+  list: { padding: 12, paddingBottom: 100, gap: 8 },
   empty: { padding: 48, alignItems: 'center' },
   emptyText: { color: '#6b7280', fontSize: 16 },
   card: { backgroundColor: '#111827', borderRadius: 12, borderWidth: 1, borderColor: '#1f2937' },

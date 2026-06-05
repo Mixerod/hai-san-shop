@@ -386,7 +386,7 @@ const s = StyleSheet.create({
   addBtn: { backgroundColor: '#0ea5e9', borderRadius: 8, padding: 8 },
   searchBox: { flexDirection: 'row', alignItems: 'center', margin: 12, backgroundColor: '#1f2937', borderRadius: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: '#374151' },
   searchInput: { flex: 1, color: '#f9fafb', paddingVertical: 10, marginLeft: 8, fontSize: 14 },
-  list: { padding: 12, gap: 8 },
+  list: { padding: 12, paddingBottom: 100, gap: 8 },
   card: { backgroundColor: '#111827', borderRadius: 12, borderWidth: 1, borderColor: '#1f2937', flexDirection: 'row', padding: 12, gap: 12 },
   thumb: { width: 60, height: 60, borderRadius: 8 },
   thumbPlaceholder: { backgroundColor: '#1f2937', justifyContent: 'center', alignItems: 'center' },

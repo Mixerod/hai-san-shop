@@ -354,7 +354,7 @@ const s = StyleSheet.create({
   headerTitle: { color: '#f9fafb', fontSize: 20, fontWeight: '700', flex: 1 },
   unreadBadge: { backgroundColor: '#ef4444', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
   unreadBadgeText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  list: { padding: 12, gap: 8 },
+  list: { padding: 12, paddingBottom: 100, gap: 8 },
   convCard: { backgroundColor: '#111827', borderRadius: 12, borderWidth: 1, borderColor: '#1f2937', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1f2937', justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: '#9ca3af', fontSize: 18, fontWeight: '700' },

@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#1f2937',
   },
   headerTitle: { color: '#f9fafb', fontSize: 20, fontWeight: '700' },
-  content: { padding: 16, gap: 16 },
+  content: { padding: 16, paddingBottom: 100, gap: 16 },
   periodRow: { flexDirection: 'row', gap: 8 },
   periodBtn: {
     flex: 1,
