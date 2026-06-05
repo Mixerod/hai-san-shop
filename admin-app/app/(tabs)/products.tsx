@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput, Switch, Alert, ActivityIndicator, Modal, ScrollView,
@@ -181,8 +181,9 @@ export default function ProductsScreen() {
     }
   }
 
-  const filtered = products.filter(p =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(() =>
+    products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase())),
+    [products, search]
   );
 
   if (loading) {

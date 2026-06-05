@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { OrderStatus } from '@/types';
 
@@ -16,7 +17,7 @@ interface Props {
   onSelect: (status: OrderStatus | 'all') => void;
 }
 
-export default function StatusFilterBar({ selected, onSelect }: Props) {
+export default memo(function StatusFilterBar({ selected, onSelect }: Props) {
   return (
     <ScrollView
       horizontal
@@ -38,7 +39,7 @@ export default function StatusFilterBar({ selected, onSelect }: Props) {
       ))}
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 12, paddingBottom: 10, gap: 8 },

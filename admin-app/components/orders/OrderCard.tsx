@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,7 @@ interface Props {
   onUpdateStatus: (id: string, status: OrderStatus) => void;
 }
 
-export default function OrderCard({ order, onUpdateStatus }: Props) {
+function OrderCard({ order, onUpdateStatus }: Props) {
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const config = STATUS_CONFIG[order.status];
@@ -134,6 +134,8 @@ export default function OrderCard({ order, onUpdateStatus }: Props) {
     </View>
   );
 }
+
+export default memo(OrderCard);
 
 const styles = StyleSheet.create({
   card: {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, TextInput,
@@ -160,7 +160,7 @@ export default function BatchScreen() {
     Alert.alert('Đã copy', 'Nội dung đã sao chép vào clipboard');
   }
 
-  const filtered = batches.filter(batch => {
+  const filtered = useMemo(() => batches.filter(batch => {
     if (filterDelivery !== 'all' && batch.deliveryType !== filterDelivery) return false;
     if (minWeight && batch.totalWeight < parseFloat(minWeight)) return false;
     if (filterProduct) {
@@ -176,7 +176,7 @@ export default function BatchScreen() {
           !batch.note.toLowerCase().includes(sv)) return false;
     }
     return true;
-  });
+  }), [batches, filterDelivery, minWeight, filterProduct, search]);
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator color="#38bdf8" size="large" /></View>;

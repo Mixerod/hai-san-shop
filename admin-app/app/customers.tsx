@@ -28,52 +28,34 @@ export default function CustomersScreen() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   async function fetchCustomers() {
-    const { data: profiles, error: profilesErr } = await supabase
+    // Single joined query instead of 2 separate queries
+    const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, phone, address');
+      .select('id, full_name, phone, address, orders(total_amount, status, created_at)');
 
-    if (profilesErr) {
+    if (error) {
       setFetchError('Không thể tải danh sách khách hàng.');
-      return;
-    }
-
-    const { data: orders, error: ordersErr } = await supabase
-      .from('orders')
-      .select('user_id, total_amount, status, created_at')
-      .not('user_id', 'is', null);
-
-    if (ordersErr) {
-      setFetchError('Không thể tải dữ liệu đơn hàng.');
       return;
     }
 
     setFetchError(null);
 
-    const map = new Map<string, Customer>();
-    for (const p of profiles ?? []) {
-      map.set(p.id, {
-        id: p.id,
-        full_name: p.full_name,
-        phone: p.phone,
-        address: p.address,
-        totalOrders: 0,
-        totalSpent: 0,
-        lastOrderDate: null,
-      });
-    }
-
-    for (const o of orders ?? []) {
-      if (!o.user_id || !map.has(o.user_id)) continue;
-      const c = map.get(o.user_id)!;
-      c.totalOrders++;
-      if (o.status === 'paid') c.totalSpent += o.total_amount;
-      if (!c.lastOrderDate || o.created_at > c.lastOrderDate) {
-        c.lastOrderDate = o.created_at;
-      }
-    }
-
-    const list = Array.from(map.values())
-      .filter(c => c.totalOrders > 0)
+    const list: Customer[] = (data ?? [])
+      .map(p => {
+        const profileOrders = (p.orders as Array<{ total_amount: number; status: string; created_at: string }>) ?? [];
+        if (profileOrders.length === 0) return null;
+        return {
+          id: p.id,
+          full_name: p.full_name,
+          phone: p.phone,
+          address: p.address,
+          totalOrders: profileOrders.length,
+          totalSpent: profileOrders.filter(o => o.status === 'paid').reduce((s, o) => s + o.total_amount, 0),
+          lastOrderDate: profileOrders.reduce<string | null>((latest, o) =>
+            !latest || o.created_at > latest ? o.created_at : latest, null),
+        } satisfies Customer;
+      })
+      .filter((c): c is Customer => c !== null)
       .sort((a, b) => b.totalSpent - a.totalSpent);
 
     setCustomers(list);

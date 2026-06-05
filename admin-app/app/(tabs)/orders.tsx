@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -62,14 +62,14 @@ export default function OrdersScreen() {
     setRefreshing(false);
   }, [filterStatus]);
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = useMemo(() => orders.filter(order => {
     if (!search.trim()) return true;
     const s = search.toLowerCase();
     const name = order.profiles?.full_name?.toLowerCase() ?? '';
     const phone = order.profiles?.phone ?? '';
     const note = order.note?.toLowerCase() ?? '';
     return name.includes(s) || phone.includes(s) || note.includes(s);
-  });
+  }), [orders, search]);
 
   async function updateStatus(orderId: string, newStatus: OrderStatus) {
     const { error } = await supabase
@@ -121,6 +121,10 @@ export default function OrdersScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#38bdf8" />
         }
         contentContainerStyle={styles.listContent}
+        removeClippedSubviews
+        initialNumToRender={10}
+        maxToRenderPerBatch={5}
+        windowSize={10}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Không có đơn hàng</Text>
