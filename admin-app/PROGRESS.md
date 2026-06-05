@@ -1,11 +1,8 @@
 # Tiến độ nâng cấp Seafood Admin App (Phases 21–25)
 
 ## 📌 Tổng quan các Phase
-- [x] **Phase 21: Critical Bug Fixes** (Hoàn thành)
-- [x] **Phase 22: UX Polish** (Hoàn thành)
-- [x] **Phase 23: Performance Optimization** (Hoàn thành)
-- [ ] **Phase 24: Responsive Layout Polish** (Đang thực hiện)
-- [ ] **Phase 25: Code Cleanup & Testing**
+- [x] **Phase 24: Responsive Layout Polish** (Hoàn thành)
+- [ ] **Phase 25: Code Cleanup & Testing** (Đang thực hiện)
 
 ---
 
@@ -36,9 +33,17 @@
 - [x] 5. Tối ưu FlatList (removeClippedSubviews, initialNumToRender, v.v.) tại `batch.tsx` và `customers.tsx`
 - [x] 6. Chạy TypeScript check, commit và push code lên remote branch
 
-### 🔄 Phase 24: Responsive Layout Polish (Đang thực hiện)
+### ✅ Phase 24: Responsive Layout Polish (Hoàn thành)
 - [x] 1. Hoàn thiện layout grid StatCard 3 cột trên tablet qua StyleSheet tại `app/(tabs)/dashboard.tsx`
 - [x] 2. Áp dụng hook `fs()` cho font sizes trong `app/(tabs)/dashboard.tsx`
 - [x] 3. Áp dụng hook `fs()` trong `app/login.tsx`
 - [x] 4. Áp dụng hook `fs()` trong `app/customers.tsx` và `app/broadcast.tsx`
-- [ ] 5. Chạy TypeScript check, commit và push code lên remote branch
+- [x] 5. Chạy TypeScript check, commit và push code lên remote branch
+
+### 🔄 Phase 25: Code Cleanup & Testing (Đang thực hiện)
+- [x] 1. Xoá file `components/AdminHeader.tsx` (dead code) sau khi grep check
+- [x] 2. Fix unsafe `(Constants as any)` tại `lib/notifications.ts`
+- [x] 3. Kiểm tra và xoá `isSmallPhone` không sử dụng trong `app/(tabs)/dashboard.tsx`
+- [x] 4. Kiểm tra null guard `row.title?.startsWith(...)` trong `app/(tabs)/chat.tsx`
+- [x] 5. Kiểm tra keyExtractor trong các FlatList
+- [ ] 6. Chạy TypeScript check, commit và push code lên remote branch
