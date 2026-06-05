@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Megaphone, Send, Trash2, Bell } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { Notification, NotificationType } from '@/types';
+import { formatDateTime } from '@/lib/formatDate';
 
 const TYPES: { value: NotificationType; label: string; desc: string; color: string }[] = [
   { value: 'general', label: 'Thông báo chung', desc: 'Thông tin, chính sách, v.v.', color: '#38bdf8' },
@@ -172,10 +173,7 @@ export default function BroadcastScreen() {
                         {typeConfig.label}
                       </Text>
                       <Text style={s.historyTime}>
-                        {new Date(notif.created_at).toLocaleDateString('vi-VN', {
-                          year: 'numeric', day: '2-digit', month: '2-digit',
-                          hour: '2-digit', minute: '2-digit',
-                        })}
+                        {formatDateTime(notif.created_at)}
                       </Text>
                     </View>
                   </View>

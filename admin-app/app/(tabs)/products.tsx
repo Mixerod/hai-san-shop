@@ -312,16 +312,19 @@ export default function ProductsScreen() {
                 onChangeText={(v: string) => setForm(f => ({ ...f, unit: v }))} />
 
               <Text style={s.fieldLabel}>Danh mục</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {CATEGORIES.map(c => (
-                    <TouchableOpacity key={c}
-                      onPress={() => setForm(f => ({ ...f, category: c }))}
-                      style={[s.chip, form.category === c && s.chipActive]}>
-                      <Text style={[s.chipText, form.category === c && s.chipTextActive]}>{c}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginBottom: 12 }}
+                contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingRight: 16 }}
+              >
+                {CATEGORIES.map(c => (
+                  <TouchableOpacity key={c}
+                    onPress={() => setForm(f => ({ ...f, category: c }))}
+                    style={[s.chip, form.category === c && s.chipActive]}>
+                    <Text style={[s.chipText, form.category === c && s.chipTextActive]}>{c}</Text>
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
 
               <Text style={s.fieldLabel}>Tag</Text>
@@ -364,6 +367,7 @@ function FormField({ label, value, onChangeText, multiline, keyboardType }: {
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
+        numberOfLines={multiline ? 4 : undefined}
         keyboardType={keyboardType ?? 'default'}
         placeholderTextColor="#4b5563"
       />

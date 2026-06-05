@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, User, Phone, MapPin, ShoppingCart, DollarSign, Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import ErrorView from '@/components/ErrorView';
+import { formatDateTime } from '@/lib/formatDate';
 
 interface Customer {
   id: string;
@@ -152,7 +153,7 @@ export default function CustomersScreen() {
               </View>
               {item.lastOrderDate && (
                 <Text style={s.lastOrder}>
-                  Đơn cuối: {new Date(item.lastOrderDate).toLocaleDateString('vi-VN')}
+                  Đơn cuối: {formatDateTime(item.lastOrderDate)}
                 </Text>
               )}
             </View>

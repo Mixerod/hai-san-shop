@@ -8,6 +8,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ChevronDown, ChevronUp, User, Phone, MapPin, Package, ExternalLink } from 'lucide-react-native';
 import { Order, OrderStatus } from '@/types';
+import { formatDateTime } from '@/lib/formatDate';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string }> = {
   pending:    { label: 'Chờ xác nhận', color: '#f59e0b' },
@@ -45,9 +46,7 @@ function OrderCard({ order, onUpdateStatus }: Props) {
     .filter(i => i.products?.unit === 'kg')
     .reduce((acc, i) => acc + i.quantity, 0);
 
-  const formattedDate = new Date(order.created_at).toLocaleDateString('vi-VN', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  });
+  const formattedDate = formatDateTime(order.created_at);
 
   return (
     <View style={styles.card}>

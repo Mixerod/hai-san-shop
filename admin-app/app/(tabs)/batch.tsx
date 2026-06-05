@@ -234,10 +234,10 @@ export default function BatchScreen() {
           <TextInput
             style={[s.filterInput, { flex: 1 }]}
             value={minWeight}
-            onChangeText={setMinWeight}
+            onChangeText={(v) => setMinWeight(v.replace(/[^0-9.]/g, ''))}
             placeholder="Min kg..."
             placeholderTextColor="#4b5563"
-            keyboardType="numeric"
+            keyboardType="decimal-pad"
           />
           {(['all', 'ship', 'company'] as const).map(d => (
             <TouchableOpacity

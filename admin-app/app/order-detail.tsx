@@ -12,6 +12,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { Order, OrderStatus } from '@/types';
 import ErrorView from '@/components/ErrorView';
+import { formatDateTime } from '@/lib/formatDate';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; icon: React.ReactNode }> = {
   pending:    { label: 'Chờ xác nhận', color: '#f59e0b', icon: <Clock color="#f59e0b" size={16} /> },
@@ -65,6 +66,7 @@ export default function OrderDetailScreen() {
       Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
     } else {
       await fetchOrder();
+      Alert.alert('Đã cập nhật', `Trạng thái: ${STATUS_CONFIG[newStatus].label}`);
     }
     setUpdating(false);
   }
@@ -92,10 +94,7 @@ export default function OrderDetailScreen() {
         <View style={{ flex: 1 }}>
           <Text style={s.headerTitle}>#{order.id.slice(-8).toUpperCase()}</Text>
           <Text style={s.headerDate}>
-            {new Date(order.created_at).toLocaleString('vi-VN', {
-              day: '2-digit', month: '2-digit', year: 'numeric',
-              hour: '2-digit', minute: '2-digit',
-            })}
+            {formatDateTime(order.created_at)}
           </Text>
         </View>
         <View style={[s.statusBadge, { backgroundColor: config.color + '22', borderColor: config.color }]}>
