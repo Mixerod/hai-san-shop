@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { Product, ProductTag } from '@/types';
+import ErrorView from '@/components/ErrorView';
 
 const CATEGORIES = ['haisan','cá tươi','cá khô','tôm','cua','mực','chả','nước mắm','khác'];
 const TAGS: { value: ProductTag; label: string }[] = [
@@ -37,13 +38,19 @@ export default function ProductsScreen() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   async function fetchProducts() {
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error && data) setProducts(data as Product[]);
+    if (error) {
+      setFetchError('Không thể tải sản phẩm. Kiểm tra kết nối mạng.');
+    } else if (data) {
+      setFetchError(null);
+      setProducts(data as Product[]);
+    }
   }
 
   useEffect(() => {
@@ -180,6 +187,10 @@ export default function ProductsScreen() {
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator color="#38bdf8" size="large" /></View>;
+  }
+
+  if (fetchError) {
+    return <ErrorView message={fetchError} onRetry={() => { setLoading(true); fetchProducts().finally(() => setLoading(false)); }} />;
   }
 
   return (

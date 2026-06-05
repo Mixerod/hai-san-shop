@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { Order, OrderStatus } from '@/types';
 import OrderCard from '@/components/orders/OrderCard';
 import StatusFilterBar from '@/components/orders/StatusFilterBar';
+import ErrorView from '@/components/ErrorView';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -21,6 +22,7 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   async function fetchOrders() {
     let query = supabase
@@ -33,7 +35,12 @@ export default function OrdersScreen() {
     }
 
     const { data, error } = await query;
-    if (!error && data) setOrders(data as Order[]);
+    if (error) {
+      setFetchError('Không thể tải đơn hàng. Kiểm tra kết nối mạng.');
+    } else if (data) {
+      setFetchError(null);
+      setOrders(data as Order[]);
+    }
   }
 
   useEffect(() => {
@@ -79,6 +86,10 @@ export default function OrdersScreen() {
         <ActivityIndicator color="#38bdf8" size="large" />
       </View>
     );
+  }
+
+  if (fetchError) {
+    return <ErrorView message={fetchError} onRetry={() => { setLoading(true); fetchOrders().finally(() => setLoading(false)); }} />;
   }
 
   return (

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import ErrorView from '@/components/ErrorView';
 
 interface Stats {
   totalRevenue: number;
@@ -69,6 +70,7 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [period, setPeriod] = useState<Period>('month');
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   async function fetchStats() {
     const periodStart = getPeriodStart(period);
@@ -82,7 +84,9 @@ export default function DashboardScreen() {
     }
 
     const { data: orders, error } = await query;
-    if (error || !orders) return;
+    if (error) { setFetchError('Không thể tải thống kê. Kiểm tra kết nối mạng.'); return; }
+    if (!orders) return;
+    setFetchError(null);
 
     const todayStart = getPeriodStart('today')!;
     const todayOrders = orders.filter(o => o.created_at >= todayStart);
@@ -126,6 +130,10 @@ export default function DashboardScreen() {
         <ActivityIndicator color="#38bdf8" size="large" />
       </View>
     );
+  }
+
+  if (fetchError) {
+    return <ErrorView message={fetchError} onRetry={() => { setLoading(true); fetchStats().finally(() => setLoading(false)); }} />;
   }
 
   return (
