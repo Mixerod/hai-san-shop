@@ -1,11 +1,13 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
-      "Bash(npx tsc *)",
-      "Bash(npx next *)",
-      "Bash(grep -n \"^          }\\)\\\\|^          \\)$\" src/app/products/page.tsx)",
-      "Bash(awk -F: '$1>957 && $1<1300{print; exit}')",
-      "Bash(grep -n \"^            \\)$\\\\|^          }\\);$\\\\|^          }\\)$\" src/app/products/page.tsx)"
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)"
     ]
   }
 }
