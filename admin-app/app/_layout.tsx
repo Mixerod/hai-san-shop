@@ -4,10 +4,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
+import { useBadgeStore } from '@/store/badges';
 import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
 
 export default function RootLayout() {
   const { session, isAdmin, setSession } = useAuthStore();
+  const { setBadges } = useBadgeStore();
   const segments = useSegments();
   const router = useRouter();
 
@@ -28,6 +30,33 @@ export default function RootLayout() {
       router.replace('/(tabs)/orders');
     }
   }, [session, isAdmin, segments]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    async function refreshBadges() {
+      const [ordersRes, chatRes] = await Promise.all([
+        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('feedbacks').select('*', { count: 'exact', head: true })
+          .eq('is_read', false)
+          .not('title', 'like', '[ADMIN]%'),
+      ]);
+      setBadges({
+        pendingOrders: ordersRes.count ?? 0,
+        unreadChat: chatRes.count ?? 0,
+      });
+    }
+
+    refreshBadges();
+
+    const channel = supabase
+      .channel('badge-counts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refreshBadges)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feedbacks' }, refreshBadges)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [session]);
 
   useEffect(() => {
     if (!session?.user) return;

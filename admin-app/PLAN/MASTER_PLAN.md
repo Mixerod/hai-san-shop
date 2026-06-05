@@ -64,6 +64,8 @@ Phase 1 (Setup)
 - [x] **Phase 8** — Batch Preparation → `PHASE_8_BATCH.md` ✅
 - [x] **Phase 9** — Broadcast Notifications → `PHASE_9_BROADCAST.md` ✅
 
+- [x] **Phase 10** — Tab Badges & Live Counters → `PHASE_10_BADGES.md` ✅
+
 ## Bug Fixes (session review)
 Đã fix các lỗi sau khi review toàn bộ code:
 1. **batch.tsx** — `Clipboard` từ `react-native` không còn tồn tại trong RN 0.76. Thay bằng `expo-clipboard` (added dependency) + đổi `setString` → `setStringAsync`.
