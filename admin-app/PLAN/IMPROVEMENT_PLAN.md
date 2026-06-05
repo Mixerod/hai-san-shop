@@ -122,10 +122,10 @@ phase14  bugs      design
 ```
 
 ## Status
-- [ ] Phase 14 — Order Detail + Link
-- [ ] Phase 15 — Chat Polling Refactor
-- [ ] Phase 16 — Performance
-- [ ] Phase 17 — Responsive Design
-- [ ] Phase 18 — TypeScript Safety
-- [ ] Phase 19 — Error Handling
-- [ ] Phase 20 — Final Polish
+- [x] Phase 14 — Order Detail + Link ✅
+- [x] Phase 15 — Chat Polling Refactor ✅
+- [x] Phase 16 — Performance ✅
+- [x] Phase 17 — Responsive Design ✅
+- [x] Phase 18 — TypeScript Safety ✅
+- [x] Phase 19 — Error Handling ✅
+- [x] Phase 20 — Final Polish ✅
