@@ -30,6 +30,7 @@ interface Message {
 }
 
 const ADMIN_PREFIX = '[ADMIN]';
+const POLL_INTERVAL = 4000;
 
 export default function ChatScreen() {
   const [view, setView] = useState<'list' | 'detail'>('list');
@@ -38,93 +39,126 @@ export default function ChatScreen() {
   const [currentIdentifier, setCurrentIdentifier] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [totalUnread, setTotalUnread] = useState(0);
   const listRef = useRef<FlatList>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // isFetching guard: prevent overlapping poll calls
+  const isFetchingRef = useRef(false);
+
+  // ─── Fetch functions ──────────────────────────────────────────────────────
 
   async function fetchConversations() {
-    const { data, error } = await supabase
-      .from('feedbacks')
-      .select('title, content, rating, is_read, created_at')
-      .order('created_at', { ascending: false });
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    try {
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .select('title, content, rating, is_read, created_at')
+        .order('created_at', { ascending: false });
 
-    if (error || !data) return;
+      if (error) { setChatError('Không thể tải tin nhắn.'); return; }
+      if (!data) return;
 
-    const map = new Map<string, Conversation>();
-    for (const row of data) {
-      const id = row.title ?? 'unknown';
-      if (id.startsWith(ADMIN_PREFIX)) continue;
-      if (!map.has(id)) {
-        map.set(id, {
-          identifier: id,
-          lastMessage: row.content,
-          lastTime: row.created_at,
-          unreadCount: 0,
-          rating: row.rating,
-        });
+      setChatError(null);
+      const map = new Map<string, Conversation>();
+      for (const row of data) {
+        const id = row.title ?? 'unknown';
+        if (id.startsWith(ADMIN_PREFIX)) continue;
+        if (!map.has(id)) {
+          map.set(id, {
+            identifier: id,
+            lastMessage: row.content,
+            lastTime: row.created_at,
+            unreadCount: 0,
+            rating: row.rating,
+          });
+        }
+        if (!row.is_read) {
+          const conv = map.get(id)!;
+          conv.unreadCount++;
+        }
       }
-      if (!row.is_read) {
-        const conv = map.get(id)!;
-        conv.unreadCount++;
-        map.set(id, conv);
-      }
+      const list = Array.from(map.values());
+      setConversations(list);
+      setTotalUnread(list.reduce((acc, c) => acc + c.unreadCount, 0));
+    } finally {
+      isFetchingRef.current = false;
     }
-    const list = Array.from(map.values());
-    setConversations(list);
-    setTotalUnread(list.reduce((acc, c) => acc + c.unreadCount, 0));
-  }
-
-  useEffect(() => {
-    fetchConversations().finally(() => setLoading(false));
-    pollRef.current = setInterval(fetchConversations, 4000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchConversations();
-    setRefreshing(false);
-  }, []);
-
-  async function openConversation(identifier: string) {
-    setCurrentIdentifier(identifier);
-    setView('detail');
-    await fetchMessages(identifier);
-    await markAllRead(identifier);
-    startPolling(identifier);
   }
 
   async function fetchMessages(identifier: string) {
-    const { data } = await supabase
-      .from('feedbacks')
-      .select('*')
-      .or(`title.eq.${identifier},title.eq.${ADMIN_PREFIX}${identifier}`)
-      .order('created_at', { ascending: true });
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    try {
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .select('*')
+        .or(`title.eq.${identifier},title.eq.${ADMIN_PREFIX}${identifier}`)
+        .order('created_at', { ascending: true });
 
-    if (data) {
-      const msgs: Message[] = data.map(row => ({
+      if (error || !data) return;
+      setMessages(data.map(row => ({
         ...row,
         isAdmin: row.title?.startsWith(ADMIN_PREFIX) ?? false,
-      }));
-      setMessages(msgs);
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+      })));
+    } finally {
+      isFetchingRef.current = false;
     }
   }
 
-  function startPolling(identifier: string) {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => fetchMessages(identifier), 4000);
-  }
+  // ─── Single polling useEffect — switches target based on view ─────────────
 
-  async function markAllRead(identifier: string) {
+  useEffect(() => {
+    let mounted = true;
+
+    async function poll() {
+      if (!mounted) return;
+      if (view === 'list') {
+        await fetchConversations();
+      } else {
+        await fetchMessages(currentIdentifier);
+      }
+    }
+
+    poll().finally(() => { if (mounted && loading) setLoading(false); });
+    const timer = setInterval(poll, POLL_INTERVAL);
+
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, currentIdentifier]);
+
+  // ─── Actions ──────────────────────────────────────────────────────────────
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    if (view === 'list') await fetchConversations();
+    else await fetchMessages(currentIdentifier);
+    setRefreshing(false);
+  }, [view, currentIdentifier]);
+
+  async function openConversation(identifier: string) {
+    setCurrentIdentifier(identifier);
+    // Mark read then switch view (polling useEffect picks up the new identifier)
     await supabase
       .from('feedbacks')
       .update({ is_read: true })
       .eq('title', identifier)
       .eq('is_read', false);
-    fetchConversations();
+    setView('detail');
+  }
+
+  async function markAllRead(identifier: string) {
+    const { error } = await supabase
+      .from('feedbacks')
+      .update({ is_read: true })
+      .eq('title', identifier)
+      .eq('is_read', false);
+    if (!error) await fetchConversations();
   }
 
   async function sendReply() {
@@ -138,6 +172,7 @@ export default function ChatScreen() {
     if (!error) {
       setReplyText('');
       await fetchMessages(currentIdentifier);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
     } else {
       Alert.alert('Lỗi', 'Không thể gửi tin nhắn');
     }
@@ -150,26 +185,22 @@ export default function ChatScreen() {
       {
         text: 'Xoá', style: 'destructive',
         onPress: async () => {
-          await supabase.from('feedbacks')
+          const { error } = await supabase.from('feedbacks')
             .delete()
             .or(`title.eq.${identifier},title.eq.${ADMIN_PREFIX}${identifier}`);
-          fetchConversations();
+          if (error) Alert.alert('Lỗi', 'Không thể xoá hội thoại');
+          else await fetchConversations();
         },
       },
     ]);
   }
 
   function goBack() {
-    if (pollRef.current) clearInterval(pollRef.current);
-    setView('list');
     setMessages([]);
-    fetchConversations();
-    pollRef.current = setInterval(fetchConversations, 4000);
+    setView('list'); // triggers polling useEffect to switch back to list poll
   }
 
-  useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator color="#38bdf8" size="large" /></View>;
@@ -195,12 +226,15 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={s.messageList}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          removeClippedSubviews
           renderItem={({ item }) => (
             <View style={[s.bubble, item.isAdmin ? s.bubbleAdmin : s.bubbleCustomer]}>
               {item.rating != null && (
                 <View style={s.ratingRow}>
-                  {[1,2,3,4,5].map(n => (
-                    <Star key={n} color={n <= item.rating! ? '#f59e0b' : '#374151'} size={14}
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star key={n}
+                      color={n <= item.rating! ? '#f59e0b' : '#374151'} size={14}
                       fill={n <= item.rating! ? '#f59e0b' : 'transparent'} />
                   ))}
                 </View>
@@ -245,11 +279,20 @@ export default function ChatScreen() {
         )}
       </View>
 
+      {chatError && (
+        <View style={s.errorBanner}>
+          <Text style={s.errorText}>{chatError}</Text>
+        </View>
+      )}
+
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.identifier}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#38bdf8" />}
         contentContainerStyle={s.list}
+        removeClippedSubviews
+        maxToRenderPerBatch={10}
+        initialNumToRender={15}
         ListEmptyComponent={
           <View style={s.empty}>
             <MessageSquare color="#374151" size={48} />
@@ -280,8 +323,9 @@ export default function ChatScreen() {
               </View>
               {item.rating != null && (
                 <View style={s.ratingRow}>
-                  {[1,2,3,4,5].map(n => (
-                    <Star key={n} color={n <= item.rating! ? '#f59e0b' : '#374151'} size={12}
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star key={n}
+                      color={n <= item.rating! ? '#f59e0b' : '#374151'} size={12}
                       fill={n <= item.rating! ? '#f59e0b' : 'transparent'} />
                   ))}
                 </View>
@@ -301,6 +345,8 @@ export default function ChatScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#030712' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#030712' },
+  errorBanner: { backgroundColor: '#7f1d1d', padding: 10, paddingHorizontal: 16 },
+  errorText: { color: '#fca5a5', fontSize: 13 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1f2937', gap: 10 },
   headerTitle: { color: '#f9fafb', fontSize: 20, fontWeight: '700', flex: 1 },
   unreadBadge: { backgroundColor: '#ef4444', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
