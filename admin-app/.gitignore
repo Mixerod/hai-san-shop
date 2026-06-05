@@ -2,6 +2,7 @@ node_modules/
 .expo/
 dist/
 .env
+!.env.example
 google-services.json
 *.jks
 *.p8
