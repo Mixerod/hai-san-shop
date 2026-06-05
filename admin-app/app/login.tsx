@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   Alert,
   useWindowDimensions,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ScrollView,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -57,66 +60,76 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.card, { maxWidth: cardMaxWidth }]}>
-        <Text style={[styles.logo, { fontSize: fs(48) }]}>🐟</Text>
-        <Text style={[styles.title, { fontSize: fs(24) }]}>Hải Sản Shop</Text>
-        <Text style={[styles.subtitle, { fontSize: fs(14) }]}>Admin Dashboard</Text>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.card, { maxWidth: cardMaxWidth }]}>
+            <Text style={[styles.logo, { fontSize: fs(48) }]}>🐟</Text>
+            <Text style={[styles.title, { fontSize: fs(24) }]}>Hải Sản Shop</Text>
+            <Text style={[styles.subtitle, { fontSize: fs(14) }]}>Admin Dashboard</Text>
 
-        <View style={styles.form}>
-          <Text style={[styles.label, { fontSize: fs(13) }]}>Email</Text>
-          <TextInput
-            style={[styles.input, { fontSize: fs(15) }]}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="admin@example.com"
-            placeholderTextColor="#4b5563"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
+            <View style={styles.form}>
+              <Text style={[styles.label, { fontSize: fs(13) }]}>Email</Text>
+              <TextInput
+                style={[styles.input, { fontSize: fs(15) }]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="admin@example.com"
+                placeholderTextColor="#4b5563"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+              />
 
-          <Text style={[styles.label, { fontSize: fs(13) }]}>Mật khẩu</Text>
-          <TextInput
-            style={[styles.input, { fontSize: fs(15) }]}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor="#4b5563"
-            secureTextEntry
-            autoComplete="password"
-          />
+              <Text style={[styles.label, { fontSize: fs(13) }]}>Mật khẩu</Text>
+              <TextInput
+                style={[styles.input, { fontSize: fs(15) }]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
+                placeholderTextColor="#4b5563"
+                secureTextEntry
+                autoComplete="password"
+              />
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={[styles.buttonText, { fontSize: fs(16) }]}>Đăng nhập</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={[styles.buttonText, { fontSize: fs(16) }]}>Đăng nhập</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  keyboardAvoid: {
     flex: 1,
     backgroundColor: '#030712',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   card: {
     width: '100%',
-    maxWidth: 400,
     backgroundColor: '#111827',
     borderRadius: 16,
     padding: 32,
@@ -168,3 +181,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
