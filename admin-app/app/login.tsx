@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const ADMIN_EMAIL = 'minhquyet08122003@gmail.com';
 
@@ -21,6 +22,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const { fs } = useResponsive();
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
@@ -59,14 +61,14 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.card, { maxWidth: cardMaxWidth }]}>
-        <Text style={styles.logo}>🐟</Text>
-        <Text style={styles.title}>Hải Sản Shop</Text>
-        <Text style={styles.subtitle}>Admin Dashboard</Text>
+        <Text style={[styles.logo, { fontSize: fs(48) }]}>🐟</Text>
+        <Text style={[styles.title, { fontSize: fs(24) }]}>Hải Sản Shop</Text>
+        <Text style={[styles.subtitle, { fontSize: fs(14) }]}>Admin Dashboard</Text>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={[styles.label, { fontSize: fs(13) }]}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { fontSize: fs(15) }]}
             value={email}
             onChangeText={setEmail}
             placeholder="admin@example.com"
@@ -76,9 +78,9 @@ export default function LoginScreen() {
             autoComplete="email"
           />
 
-          <Text style={styles.label}>Mật khẩu</Text>
+          <Text style={[styles.label, { fontSize: fs(13) }]}>Mật khẩu</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { fontSize: fs(15) }]}
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
@@ -95,7 +97,7 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Đăng nhập</Text>
+              <Text style={[styles.buttonText, { fontSize: fs(16) }]}>Đăng nhập</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -123,18 +125,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    fontSize: 48,
     marginBottom: 8,
   },
   title: {
     color: '#f9fafb',
-    fontSize: 24,
     fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
     color: '#6b7280',
-    fontSize: 14,
     marginBottom: 32,
   },
   form: {
@@ -142,7 +141,6 @@ const styles = StyleSheet.create({
   },
   label: {
     color: '#9ca3af',
-    fontSize: 13,
     marginBottom: 6,
     marginTop: 16,
   },
@@ -154,7 +152,6 @@ const styles = StyleSheet.create({
     color: '#f9fafb',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
   },
   button: {
     backgroundColor: '#0ea5e9',
@@ -168,7 +165,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
     fontWeight: '600',
   },
 });

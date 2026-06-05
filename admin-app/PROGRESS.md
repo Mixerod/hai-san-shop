@@ -3,8 +3,8 @@
 ## 📌 Tổng quan các Phase
 - [x] **Phase 21: Critical Bug Fixes** (Hoàn thành)
 - [x] **Phase 22: UX Polish** (Hoàn thành)
-- [ ] **Phase 23: Performance Optimization** (Đang thực hiện)
-- [ ] **Phase 24: Responsive Layout Polish**
+- [x] **Phase 23: Performance Optimization** (Hoàn thành)
+- [ ] **Phase 24: Responsive Layout Polish** (Đang thực hiện)
 - [ ] **Phase 25: Code Cleanup & Testing**
 
 ---
@@ -28,10 +28,17 @@
 - [x] 6. Hiển thị đầy đủ date + time cho khách hàng tại `app/customers.tsx:155`
 - [x] 7. Chạy TypeScript check, commit và push code lên remote branch
 
-### 🔄 Phase 23: Performance Optimization (Đang thực hiện)
+### ✅ Phase 23: Performance Optimization (Hoàn thành)
 - [x] 1. Memoize FormField component tại `app/(tabs)/products.tsx`
 - [x] 2. Memoize StatCard component tại `app/(tabs)/dashboard.tsx`
 - [x] 3. Tạo hook `hooks/useDebounce.ts`
 - [x] 4. Áp dụng debounce search cho `orders.tsx`, `products.tsx`, `customers.tsx`, `batch.tsx`
-- [ ] 5. Tối ưu FlatList (removeClippedSubviews, initialNumToRender, v.v.) tại `batch.tsx` và `customers.tsx`
-- [ ] 6. Chạy TypeScript check, commit và push code lên remote branch
+- [x] 5. Tối ưu FlatList (removeClippedSubviews, initialNumToRender, v.v.) tại `batch.tsx` và `customers.tsx`
+- [x] 6. Chạy TypeScript check, commit và push code lên remote branch
+
+### 🔄 Phase 24: Responsive Layout Polish (Đang thực hiện)
+- [x] 1. Hoàn thiện layout grid StatCard 3 cột trên tablet qua StyleSheet tại `app/(tabs)/dashboard.tsx`
+- [x] 2. Áp dụng hook `fs()` cho font sizes trong `app/(tabs)/dashboard.tsx`
+- [x] 3. Áp dụng hook `fs()` trong `app/login.tsx`
+- [x] 4. Áp dụng hook `fs()` trong `app/customers.tsx` và `app/broadcast.tsx`
+- [ ] 5. Chạy TypeScript check, commit và push code lên remote branch

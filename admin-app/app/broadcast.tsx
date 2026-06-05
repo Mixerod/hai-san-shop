@@ -9,6 +9,7 @@ import { ArrowLeft, Megaphone, Send, Trash2, Bell } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { Notification, NotificationType } from '@/types';
 import { formatDateTime } from '@/lib/formatDate';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const TYPES: { value: NotificationType; label: string; desc: string; color: string }[] = [
   { value: 'general', label: 'Thông báo chung', desc: 'Thông tin, chính sách, v.v.', color: '#38bdf8' },
@@ -18,6 +19,7 @@ const TYPES: { value: NotificationType; label: string; desc: string; color: stri
 
 export default function BroadcastScreen() {
   const router = useRouter();
+  const { fs } = useResponsive();
   const [message, setMessage] = useState('');
   const [type, setType] = useState<NotificationType>('general');
   const [sending, setSending] = useState(false);
@@ -92,17 +94,17 @@ export default function BroadcastScreen() {
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <ArrowLeft color="#9ca3af" size={22} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Broadcast</Text>
+        <Text style={[s.headerTitle, { fontSize: fs(18) }]}>Broadcast</Text>
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.section}>
           <View style={s.sectionHeader}>
             <Megaphone color="#f59e0b" size={18} />
-            <Text style={s.sectionTitle}>Soạn thông báo</Text>
+            <Text style={[s.sectionTitle, { fontSize: fs(16) }]}>Soạn thông báo</Text>
           </View>
 
-          <Text style={s.label}>Loại thông báo</Text>
+          <Text style={[s.label, { fontSize: fs(13) }]}>Loại thông báo</Text>
           <View style={s.typeRow}>
             {TYPES.map(t => (
               <TouchableOpacity
@@ -110,17 +112,17 @@ export default function BroadcastScreen() {
                 onPress={() => setType(t.value)}
                 style={[s.typeChip, type === t.value && { backgroundColor: t.color + '22', borderColor: t.color }]}
               >
-                <Text style={[s.typeChipText, type === t.value && { color: t.color }]}>
+                <Text style={[s.typeChipText, { fontSize: fs(13) }, type === t.value && { color: t.color }]}>
                   {t.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={s.typeDesc}>{selectedType.desc}</Text>
+          <Text style={[s.typeDesc, { fontSize: fs(12) }]}>{selectedType.desc}</Text>
 
-          <Text style={s.label}>Nội dung</Text>
+          <Text style={[s.label, { fontSize: fs(13) }]}>Nội dung</Text>
           <TextInput
-            style={s.messageInput}
+            style={[s.messageInput, { fontSize: fs(15) }]}
             value={message}
             onChangeText={setMessage}
             placeholder={
@@ -132,7 +134,7 @@ export default function BroadcastScreen() {
             multiline
             maxLength={500}
           />
-          <Text style={s.charCount}>{message.length}/500</Text>
+          <Text style={[s.charCount, { fontSize: fs(12) }]}>{message.length}/500</Text>
 
           <TouchableOpacity
             style={[s.sendBtn, (!message.trim() || sending) && s.sendBtnDisabled]}
@@ -144,7 +146,7 @@ export default function BroadcastScreen() {
             ) : (
               <>
                 <Send color="#fff" size={18} />
-                <Text style={s.sendBtnText}>Gửi thông báo</Text>
+                <Text style={[s.sendBtnText, { fontSize: fs(16) }]}>Gửi thông báo</Text>
               </>
             )}
           </TouchableOpacity>
@@ -153,13 +155,13 @@ export default function BroadcastScreen() {
         <View style={s.section}>
           <View style={s.sectionHeader}>
             <Bell color="#38bdf8" size={18} />
-            <Text style={s.sectionTitle}>Lịch sử gửi</Text>
+            <Text style={[s.sectionTitle, { fontSize: fs(16) }]}>Lịch sử gửi</Text>
           </View>
 
           {loadingHistory ? (
             <ActivityIndicator color="#38bdf8" />
           ) : history.length === 0 ? (
-            <Text style={s.emptyText}>Chưa có thông báo nào</Text>
+            <Text style={[s.emptyText, { fontSize: fs(14) }]}>Chưa có thông báo nào</Text>
           ) : (
             history.map(notif => {
               const typeConfig = TYPES.find(t => t.value === notif.type) ?? TYPES[0];
@@ -167,12 +169,12 @@ export default function BroadcastScreen() {
                 <View key={notif.id} style={s.historyItem}>
                   <View style={[s.typeDot, { backgroundColor: typeConfig.color }]} />
                   <View style={s.historyContent}>
-                    <Text style={s.historyMessage}>{notif.message}</Text>
+                    <Text style={[s.historyMessage, { fontSize: fs(14) }]}>{notif.message}</Text>
                     <View style={s.historyMeta}>
-                      <Text style={[s.historyType, { color: typeConfig.color }]}>
+                      <Text style={[s.historyType, { color: typeConfig.color, fontSize: fs(12) }]}>
                         {typeConfig.label}
                       </Text>
-                      <Text style={s.historyTime}>
+                      <Text style={[s.historyTime, { fontSize: fs(12) }]}>
                         {formatDateTime(notif.created_at)}
                       </Text>
                     </View>
@@ -194,29 +196,29 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#030712' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#1f2937', gap: 8 },
   backBtn: { padding: 6 },
-  headerTitle: { color: '#f9fafb', fontSize: 18, fontWeight: '700' },
+  headerTitle: { color: '#f9fafb', fontWeight: '700' },
   content: { padding: 16, gap: 20 },
   section: { gap: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitle: { color: '#f9fafb', fontSize: 16, fontWeight: '600' },
-  label: { color: '#9ca3af', fontSize: 13 },
+  sectionTitle: { color: '#f9fafb', fontWeight: '600' },
+  label: { color: '#9ca3af' },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#374151' },
-  typeChipText: { color: '#6b7280', fontSize: 13, fontWeight: '500' },
-  typeDesc: { color: '#4b5563', fontSize: 12, fontStyle: 'italic' },
+  typeChipText: { color: '#6b7280', fontWeight: '500' },
+  typeDesc: { color: '#4b5563', fontStyle: 'italic' },
   messageInput: {
     backgroundColor: '#111827', borderRadius: 12, borderWidth: 1, borderColor: '#374151',
-    color: '#f9fafb', padding: 14, fontSize: 15, minHeight: 120,
+    color: '#f9fafb', padding: 14, minHeight: 120,
     textAlignVertical: 'top', lineHeight: 22,
   },
-  charCount: { color: '#374151', fontSize: 12, textAlign: 'right' },
+  charCount: { color: '#374151', textAlign: 'right' },
   sendBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#0ea5e9', borderRadius: 12, paddingVertical: 14, gap: 8,
   },
   sendBtnDisabled: { opacity: 0.5 },
-  sendBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  emptyText: { color: '#4b5563', fontSize: 14, textAlign: 'center', padding: 20 },
+  sendBtnText: { color: '#fff', fontWeight: '600' },
+  emptyText: { color: '#4b5563', textAlign: 'center', padding: 20 },
   historyItem: {
     flexDirection: 'row', alignItems: 'flex-start',
     backgroundColor: '#111827', borderRadius: 10, padding: 12, gap: 10,
@@ -224,9 +226,9 @@ const s = StyleSheet.create({
   },
   typeDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   historyContent: { flex: 1, gap: 4 },
-  historyMessage: { color: '#d1d5db', fontSize: 14, lineHeight: 20 },
+  historyMessage: { color: '#d1d5db', lineHeight: 20 },
   historyMeta: { flexDirection: 'row', gap: 10 },
-  historyType: { fontSize: 12, fontWeight: '500' },
-  historyTime: { color: '#6b7280', fontSize: 12 },
+  historyType: { fontWeight: '500' },
+  historyTime: { color: '#6b7280' },
   deleteBtn: { padding: 4 },
 });

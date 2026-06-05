@@ -285,13 +285,18 @@ interface StatCardProps {
 }
 
 const StatCard = memo(function StatCard({ icon, label, value, color, isTablet }: StatCardProps) {
+  const { fs } = useResponsive();
   return (
-    <View style={[statStyles.card, { borderColor: color + '33' }, isTablet ? { flexBasis: '28%' } : { flexBasis: '45%' }]}>
+    <View style={[
+      statStyles.card,
+      { borderColor: color + '33' },
+      isTablet ? statStyles.cardTablet : statStyles.cardPhone
+    ]}>
       <View style={[statStyles.iconBox, { backgroundColor: color + '22' }]}>
         {icon}
       </View>
-      <Text style={statStyles.label}>{label}</Text>
-      <Text style={[statStyles.value, { color }]}>{value}</Text>
+      <Text style={[statStyles.label, { fontSize: fs(13) }]}>{label}</Text>
+      <Text style={[statStyles.value, { color, fontSize: fs(18) }]}>{value}</Text>
     </View>
   );
 });
@@ -305,6 +310,8 @@ const statStyles = StyleSheet.create({
     flexGrow: 1,
     gap: 8,
   },
+  cardPhone: { flexBasis: '45%' },
+  cardTablet: { flexBasis: '28%' },
   iconBox: {
     width: 40,
     height: 40,
@@ -312,8 +319,8 @@ const statStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  label: { color: '#9ca3af', fontSize: 13 },
-  value: { fontSize: 18, fontWeight: '700' },
+  label: { color: '#9ca3af' },
+  value: { fontWeight: '700' },
 });
 
 const styles = StyleSheet.create({
