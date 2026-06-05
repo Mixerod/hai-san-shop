@@ -3,9 +3,9 @@
 ## 📌 Kế hoạch Kiểm thử & Sửa lỗi
 - [x] 1. Kiểm tra khả năng bấm/chạm (tap interaction) vào hai ô nhập liệu Email và Mật khẩu.
 - [x] 2. Sửa lỗi `KeyboardAvoidingView` chặn tương tác cảm ứng trên Android/iOS.
-- [ ] 3. Kiểm tra tính năng ẩn/hiện mật khẩu (nếu có) và hiển thị placeholder.
-- [ ] 4. Kiểm tra nút "Đăng nhập" (trạng thái loading, nút bị disable khi đang chạy API).
-- [ ] 5. Kiểm tra kết nối Supabase Auth:
+- [x] 3. Kiểm tra tính năng ẩn/hiện mật khẩu (nếu có) và hiển thị placeholder.
+- [x] 4. Kiểm tra nút "Đăng nhập" (trạng thái loading, nút bị disable khi đang chạy API).
+- [x] 5. Kiểm tra kết nối Supabase Auth:
   - Trường hợp nhập sai định dạng email/mật khẩu -> hiển thị Alert cảnh báo đúng.
   - Trường hợp tài khoản không phải là admin -> thông báo từ chối quyền truy cập và tự động đăng xuất.
   - Trường hợp đăng nhập thành công với tài khoản `minhquyet08122003@gmail.com` -> điều hướng tự động về màn hình Orders.
