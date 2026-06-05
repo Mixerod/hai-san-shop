@@ -67,6 +67,7 @@ Phase 1 (Setup)
 - [x] **Phase 10** — Tab Badges & Live Counters → `PHASE_10_BADGES.md` ✅
 - [x] **Phase 11** — Error States & Network Handling → `PHASE_11_ERROR_STATES.md` ✅
 - [x] **Phase 12** — Setup Files & Documentation → `PHASE_12_SETUP_FILES.md` ✅
+- [x] **Phase 13** — Quản lý Khách hàng → `PHASE_13_CUSTOMERS.md` ✅
 
 ## Bug Fixes (session review)
 Đã fix các lỗi sau khi review toàn bộ code:

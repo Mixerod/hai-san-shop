@@ -17,6 +17,7 @@ import {
   TrendingUp,
   AlertCircle,
   Megaphone,
+  UserCircle,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -225,6 +226,17 @@ export default function DashboardScreen() {
             Gửi thông báo cho khách
           </Text>
         </TouchableOpacity>
+
+        {/* Customers button */}
+        <TouchableOpacity
+          style={customersBtnStyle}
+          onPress={() => router.push('/customers')}
+        >
+          <UserCircle color="#f472b6" size={20} />
+          <Text style={{ color: '#f9fafb', fontSize: 15, fontWeight: '600' }}>
+            Danh sách khách hàng
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -241,6 +253,18 @@ const broadcastBtnStyle = {
   borderColor: '#f59e0b44',
   paddingVertical: 14,
   marginTop: 8,
+};
+
+const customersBtnStyle = {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  gap: 10,
+  backgroundColor: '#111827',
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#f472b644',
+  paddingVertical: 14,
 };
 
 interface StatCardProps {
