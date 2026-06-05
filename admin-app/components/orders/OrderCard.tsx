@@ -5,7 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { ChevronDown, ChevronUp, User, Phone, MapPin, Package } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { ChevronDown, ChevronUp, User, Phone, MapPin, Package, ExternalLink } from 'lucide-react-native';
 import { Order, OrderStatus } from '@/types';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string }> = {
@@ -36,6 +37,7 @@ interface Props {
 
 export default function OrderCard({ order, onUpdateStatus }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
   const config = STATUS_CONFIG[order.status];
   const nextStatuses = NEXT_STATUSES[order.status] ?? [];
 
@@ -107,21 +109,26 @@ export default function OrderCard({ order, onUpdateStatus }: Props) {
             </View>
           ))}
 
-          {nextStatuses.length > 0 && (
-            <View style={styles.actionRow}>
-              {nextStatuses.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.actionBtn, { borderColor: STATUS_CONFIG[s].color }]}
-                  onPress={() => onUpdateStatus(order.id, s)}
-                >
-                  <Text style={[styles.actionBtnText, { color: STATUS_CONFIG[s].color }]}>
-                    → {STATUS_CONFIG[s].label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.detailBtn}
+              onPress={() => router.push({ pathname: '/order-detail', params: { id: order.id } })}
+            >
+              <ExternalLink color="#6b7280" size={14} />
+              <Text style={styles.detailBtnText}>Chi tiết</Text>
+            </TouchableOpacity>
+            {nextStatuses.map((s) => (
+              <TouchableOpacity
+                key={s}
+                style={[styles.actionBtn, { borderColor: STATUS_CONFIG[s].color }]}
+                onPress={() => onUpdateStatus(order.id, s)}
+              >
+                <Text style={[styles.actionBtnText, { color: STATUS_CONFIG[s].color }]}>
+                  → {STATUS_CONFIG[s].label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       )}
     </View>
@@ -161,6 +168,8 @@ const styles = StyleSheet.create({
   itemQty: { color: '#a78bfa', fontSize: 13 },
   itemPrice: { color: '#38bdf8', fontSize: 13 },
   actionRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 },
+  detailBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#374151' },
+  detailBtnText: { color: '#6b7280', fontSize: 13 },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   actionBtnText: { fontSize: 13, fontWeight: '500' },
 });
