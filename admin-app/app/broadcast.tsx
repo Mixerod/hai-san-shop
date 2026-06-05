@@ -173,7 +173,8 @@ export default function BroadcastScreen() {
                       </Text>
                       <Text style={s.historyTime}>
                         {new Date(notif.created_at).toLocaleDateString('vi-VN', {
-                          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                          year: 'numeric', day: '2-digit', month: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
                         })}
                       </Text>
                     </View>

@@ -186,36 +186,42 @@ export default function DashboardScreen() {
             label="Doanh thu"
             value={(stats?.totalRevenue ?? 0).toLocaleString('vi-VN') + 'đ'}
             color="#22c55e"
+            isTablet={isTablet}
           />
           <StatCard
             icon={<AlertCircle color="#f59e0b" size={22} />}
             label="Chờ xác nhận"
             value={`${stats?.pendingCount ?? 0} đơn`}
             color="#f59e0b"
+            isTablet={isTablet}
           />
           <StatCard
             icon={<TrendingUp color="#8b5cf6" size={22} />}
             label="Chưa thu tiền"
             value={(stats?.pendingAmount ?? 0).toLocaleString('vi-VN') + 'đ'}
             color="#8b5cf6"
+            isTablet={isTablet}
           />
           <StatCard
             icon={<Clock color="#3b82f6" size={22} />}
             label="Đang xử lý"
             value={`${stats?.processingCount ?? 0} đơn`}
             color="#3b82f6"
+            isTablet={isTablet}
           />
           <StatCard
             icon={<ShoppingCart color="#38bdf8" size={22} />}
             label="Tổng đơn"
             value={`${stats?.totalOrders ?? 0} đơn`}
             color="#38bdf8"
+            isTablet={isTablet}
           />
           <StatCard
             icon={<Users color="#f472b6" size={22} />}
             label="Khách unique"
             value={`${stats?.uniqueCustomers ?? 0} người`}
             color="#f472b6"
+            isTablet={isTablet}
           />
         </View>
 
@@ -275,11 +281,12 @@ interface StatCardProps {
   label: string;
   value: string;
   color: string;
+  isTablet?: boolean;
 }
 
-function StatCard({ icon, label, value, color }: StatCardProps) {
+function StatCard({ icon, label, value, color, isTablet }: StatCardProps) {
   return (
-    <View style={[statStyles.card, { borderColor: color + '33' }]}>
+    <View style={[statStyles.card, { borderColor: color + '33' }, isTablet ? { flexBasis: '28%' } : { flexBasis: '45%' }]}>
       <View style={[statStyles.iconBox, { backgroundColor: color + '22' }]}>
         {icon}
       </View>
@@ -296,7 +303,6 @@ const statStyles = StyleSheet.create({
     borderWidth: 1,
     padding: 16,
     flexGrow: 1,
-    flexBasis: '45%',   // ≥2 per row on phone, more on tablet via gridTablet
     gap: 8,
   },
   iconBox: {

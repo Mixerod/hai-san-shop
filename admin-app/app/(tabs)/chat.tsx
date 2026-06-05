@@ -97,8 +97,11 @@ export default function ChatScreen() {
         .select('*')
         .or(`title.eq.${identifier},title.eq.${ADMIN_PREFIX}${identifier}`)
         .order('created_at', { ascending: true });
-
-      if (error || !data) return;
+      if (error || !data) {
+        setChatError('Không thể tải tin nhắn.');
+        return;
+      }
+      setChatError(null);
       setMessages(data.map(row => ({
         ...row,
         isAdmin: row.title?.startsWith(ADMIN_PREFIX) ?? false,

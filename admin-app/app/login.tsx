@@ -39,7 +39,7 @@ export default function LoginScreen() {
         return;
       }
 
-      if (data.user?.email !== ADMIN_EMAIL) {
+      if (data.user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
         await supabase.auth.signOut();
         Alert.alert('Không có quyền', 'Tài khoản này không có quyền admin.');
         return;

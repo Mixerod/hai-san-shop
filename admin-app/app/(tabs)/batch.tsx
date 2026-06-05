@@ -71,9 +71,22 @@ export default function BatchScreen() {
     }
     setFetchError(null);
 
+    type BatchOrder = {
+      id: string;
+      total_amount: number;
+      note: string | null;
+      status: string;
+      profiles: { full_name: string | null; phone: string | null; address: string | null } | null;
+      order_items: Array<{
+        quantity: number;
+        price_at_time: number;
+        products: { name: string | null; unit: string | null; price: number } | null;
+      }>;
+    };
+
     const map = new Map<string, CustomerBatch>();
 
-    for (const order of orders as any[]) {
+    for (const order of orders as unknown as BatchOrder[]) {
       const phone = order.profiles?.phone ?? '';
       const name = order.profiles?.full_name ?? 'Khách vãng lai';
       const key = phone || name;
