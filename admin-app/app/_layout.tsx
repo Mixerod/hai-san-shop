@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
 import { useBadgeStore } from '@/store/badges';
 import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function RootLayout() {
   const { session, isAdmin, setSession } = useAuthStore();
@@ -50,7 +51,7 @@ export default function RootLayout() {
     refreshBadges();
 
     const channel = supabase
-      .channel('badge-counts')
+      .channel(`badge-counts-${session.user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refreshBadges)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feedbacks' }, refreshBadges)
       .subscribe();
@@ -78,8 +79,10 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <ErrorBoundary>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

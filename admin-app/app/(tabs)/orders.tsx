@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ export default function OrdersScreen() {
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const channelId = useRef(`orders-${Math.random().toString(36).slice(2)}`);
 
   async function fetchOrders() {
     let query = supabase
@@ -47,7 +48,7 @@ export default function OrdersScreen() {
     fetchOrders().finally(() => setLoading(false));
 
     const channel = supabase
-      .channel('orders-changes')
+      .channel(channelId.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         fetchOrders();
       })

@@ -11,6 +11,7 @@ import {
   Truck, Building2, ChevronDown, ChevronUp,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import ErrorView from '@/components/ErrorView';
 
 interface CustomerBatch {
   key: string;
@@ -51,6 +52,7 @@ export default function BatchScreen() {
   const [filterProduct, setFilterProduct] = useState('');
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [showSummary, setShowSummary] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   async function fetchBatches() {
     const { data: orders, error } = await supabase
@@ -63,7 +65,11 @@ export default function BatchScreen() {
       .in('status', ['pending', 'confirmed'])
       .order('created_at', { ascending: true });
 
-    if (error || !orders) return;
+    if (error || !orders) {
+      setFetchError('Không thể tải danh sách chuẩn bị hàng. Kiểm tra kết nối mạng.');
+      return;
+    }
+    setFetchError(null);
 
     const map = new Map<string, CustomerBatch>();
 
@@ -180,6 +186,10 @@ export default function BatchScreen() {
 
   if (loading) {
     return <View style={s.center}><ActivityIndicator color="#38bdf8" size="large" /></View>;
+  }
+
+  if (fetchError) {
+    return <ErrorView message={fetchError} onRetry={() => { setLoading(true); fetchBatches().finally(() => setLoading(false)); }} />;
   }
 
   return (

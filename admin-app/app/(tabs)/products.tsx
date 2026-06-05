@@ -141,19 +141,8 @@ export default function ProductsScreen() {
     }
   }
 
-  async function saveProduct() {
-    if (!form.name.trim() || !form.price) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tên và giá sản phẩm');
-      return;
-    }
-    setSaving(true);
+  async function commitSave(imageUrl: string | null) {
     try {
-      let imageUrl = editing?.image_url ?? null;
-
-      if (imageUri && imageUri !== editing?.image_url) {
-        imageUrl = await uploadImage(imageUri);
-      }
-
       const payload = {
         name: form.name.trim(),
         description: form.description || null,
@@ -166,13 +155,11 @@ export default function ProductsScreen() {
         in_stock: form.in_stock,
         image_url: imageUrl,
       };
-
       if (editing) {
         await supabase.from('products').update(payload).eq('id', editing.id);
       } else {
         await supabase.from('products').insert(payload);
       }
-
       setShowModal(false);
       fetchProducts();
     } catch (e) {
@@ -180,6 +167,30 @@ export default function ProductsScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveProduct() {
+    if (!form.name.trim() || !form.price) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên và giá sản phẩm');
+      return;
+    }
+    setSaving(true);
+
+    let imageUrl = editing?.image_url ?? null;
+
+    if (imageUri && imageUri !== editing?.image_url) {
+      const uploaded = await uploadImage(imageUri);
+      if (uploaded === null) {
+        Alert.alert('Lỗi upload ảnh', 'Không thể tải ảnh lên. Lưu không có ảnh?', [
+          { text: 'Huỷ', style: 'cancel', onPress: () => setSaving(false) },
+          { text: 'Lưu không ảnh', onPress: () => commitSave(null) },
+        ]);
+        return;
+      }
+      imageUrl = uploaded;
+    }
+
+    await commitSave(imageUrl);
   }
 
   const filtered = useMemo(() =>
