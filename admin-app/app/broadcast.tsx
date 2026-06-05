@@ -179,7 +179,7 @@ export default function BroadcastScreen() {
                     </View>
                   </View>
                   <TouchableOpacity onPress={() => deleteNotification(notif.id)} style={s.deleteBtn}>
-                    <Trash2 color="#ef444466" size={16} />
+                    <Trash2 color="#ef4444" size={16} />
                   </TouchableOpacity>
                 </View>
               );

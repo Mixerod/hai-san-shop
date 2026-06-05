@@ -288,7 +288,7 @@ export default function ChatScreen() {
               )}
             </View>
             <TouchableOpacity onPress={() => deleteConversation(item.identifier)} style={s.deleteBtn}>
-              <Trash2 color="#ef444444" size={16} />
+              <Trash2 color="#ef4444" size={16} />
             </TouchableOpacity>
             <ChevronRight color="#374151" size={18} />
           </TouchableOpacity>

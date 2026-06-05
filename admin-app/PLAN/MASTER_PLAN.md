@@ -64,6 +64,13 @@ Phase 1 (Setup)
 - [x] **Phase 8** — Batch Preparation → `PHASE_8_BATCH.md` ✅
 - [x] **Phase 9** — Broadcast Notifications → `PHASE_9_BROADCAST.md` ✅
 
+## Bug Fixes (session review)
+Đã fix các lỗi sau khi review toàn bộ code:
+1. **batch.tsx** — `Clipboard` từ `react-native` không còn tồn tại trong RN 0.76. Thay bằng `expo-clipboard` (added dependency) + đổi `setString` → `setStringAsync`.
+2. **chat.tsx** — Hex color `#ef444444` (8 chữ số, không hợp lệ) → `#ef4444`.
+3. **broadcast.tsx** — Hex color `#ef444466` (8 chữ số, không hợp lệ) → `#ef4444`.
+4. **types/index.ts** — `Product.total_sold` không có trong DB schema, đổi thành optional (`total_sold?: number`).
+
 ## Cách sử dụng các file .md này
 1. Mỗi file `.md` là **self-contained** — agent chỉ cần đọc file đó là đủ thông tin để thực thi
 2. Sau khi xong một Phase, **đánh dấu checkbox** trong MASTER_PLAN.md

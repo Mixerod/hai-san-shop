@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, TextInput, Clipboard,
+  RefreshControl, TextInput,
   ActivityIndicator, Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ClipboardCopy, RefreshCcw, Filter, Package, Scale,
@@ -155,7 +156,7 @@ export default function BatchScreen() {
       batch.note ? `📝 ${batch.note}` : null,
     ].filter(Boolean).join('\n');
 
-    Clipboard.setString(lines);
+    Clipboard.setStringAsync(lines);
     Alert.alert('Đã copy', 'Nội dung đã sao chép vào clipboard');
   }
 

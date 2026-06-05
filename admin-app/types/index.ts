@@ -44,7 +44,7 @@ export interface Product {
   category: string;
   tag: ProductTag;
   note: string | null;
-  total_sold: number;
+  total_sold?: number;
   created_at: string;
 }
 
