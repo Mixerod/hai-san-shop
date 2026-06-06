@@ -75,7 +75,7 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 | B5 | UI admin: cấu hình hạng & quyền lợi | ✅ | 05 | Component MembershipTiersAdmin, tab mới trong /admin. **CẦN chạy `LENH-SQL-B5-ADMIN-RPC-TIERS.txt` trên Supabase** (RPC ghi config) |
 | B6 | UI admin: cấu hình voucher / quà / mốc thưởng | ✅ | 05 | Tab con Voucher/Quà/Mốc thưởng trong "Thành viên & Ưu đãi". **CẦN chạy `LENH-SQL-B6-ADMIN-RPC-VOUCHER-GIFT-RULES.txt` trên Supabase** (RPC ghi config) |
 | B7 | UI admin: trao hạng/voucher/quà thủ công + audit log | ✅ | 05 | Tab "Khách hàng" trong "Thành viên & Ưu đãi". **CẦN chạy `LENH-SQL-B7-ADMIN-RPC-MANUAL-GRANT-AUDIT.txt` trên Supabase** (RPC trao/đặt hạng/điều chỉnh + đọc khách/ví/audit) |
-| B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ⬜ | 06 | |
+| B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ✅ | 06 | Tab "Thành viên" ở /profile. **KHÔNG cần chạy SQL** — đọc trực tiếp qua RLS (profiles owner-read + membership_tiers công khai) |
 | B9 | UI khách: ví voucher + áp voucher tại /checkout | ⬜ | 06 | |
 | B10 | Tích hợp giảm giá hạng vào tính tiền đơn | ⬜ | 04, 06 | Cẩn thận giá tại checkout |
 | B11 | Test: idempotency, race, duplicate voucher | ⬜ | 07 | |
@@ -146,6 +146,18 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
+- **2026-06-06** — **B8 ✅**: Thêm tab **"Thành viên"** vào `/profile`
+  (`src/app/profile/page.tsx`: mở rộng `activeTab` thêm `'membership'`, đọc `?tab=membership`, nút tab
+  thứ 3 icon Crown). Tách UI vào component KHÁCH mới `src/components/membership/CustomerMembershipCard.tsx`
+  (theme SÁNG khớp /profile, khác ui.tsx admin tối). Hiển thị **Khối A** (huy hiệu hạng — badge màu theo
+  `membership_tiers.color`, tổng chi tiêu `lifetime_spend` + tổng kg `lifetime_kg`, danh sách quyền lợi:
+  `discount_percent` / `free_ship` / `perks[]`) + **Khối B** (thanh tiến độ % tới hạng kế theo
+  `sort_order` kế tiếp, tính theo **TIỀN** `lifetime_spend / next.min_spend` — CĐ-2 money-only; "Còn X đồng
+  nữa để lên [hạng]"; "Bạn đang ở hạng cao nhất 🎉" khi hết hạng). Trạng thái rỗng/loading/lỗi gọn gàng.
+  **CHỈ ĐỌC qua RLS**: `profiles` của chính mình (owner-read) + `membership_tiers` công khai (is_active=true);
+  KHÔNG ghi, KHÔNG gọi RPC admin_*. **➡️ Quyết định kiến trúc: KHÔNG thêm RPC/không cần file SQL** — 2 query
+  RLS trực tiếp là đủ (KISS), nên B8 chạy được ngay với schema B1–B4 đã có. Build ✅ (TypeScript pass).
+  _(by Claude — phiên local)_
 - **2026-06-06** — **B7 ✅**: Bật tab **"Khách hàng"** trong khu "Thành viên & Ưu đãi"
   (`MembershipAdmin.tsx` bỏ disabled → render `MembershipCustomersAdmin`). Danh sách khách
   **phân trang + tìm kiếm** (tên/SĐT/email) qua RPC `admin_list_customers` (07 mục 3: không

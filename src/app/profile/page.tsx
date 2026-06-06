@@ -6,14 +6,15 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { 
-  User, 
-  Package, 
-  LogOut, 
-  Loader2, 
-  AlertCircle, 
-  CheckCircle2, 
-  ChevronDown, 
+import CustomerMembershipCard from '@/components/membership/CustomerMembershipCard'
+import {
+  User,
+  Package,
+  LogOut,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
   ChevronUp,
   MapPin,
   Phone,
@@ -21,7 +22,8 @@ import {
   CreditCard,
   MessageCircle,
   Check,
-  Info
+  Info,
+  Crown
 } from 'lucide-react'
 
 // Types
@@ -131,7 +133,7 @@ function ProfileContent() {
   const router = useRouter()
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'membership'>('profile')
 
   // Profile states
   const [profile, setProfile] = useState<Profile>({ id: '', full_name: '', phone: '', address: '' })
@@ -153,8 +155,8 @@ function ProfileContent() {
   const tabParam = searchParams.get('tab')
 
   useEffect(() => {
-    if (tabParam === 'orders') {
-      setActiveTab('orders')
+    if (tabParam === 'orders' || tabParam === 'membership') {
+      setActiveTab(tabParam)
     }
   }, [tabParam])
 
@@ -406,6 +408,17 @@ function ProfileContent() {
           >
             <Package className="w-4.5 h-4.5" />
             Lịch sử mua hàng
+          </button>
+          <button
+            onClick={() => setActiveTab('membership')}
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2.5 py-3 sm:py-4 px-2 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 ${
+              activeTab === 'membership'
+                ? 'bg-white text-blue-600 shadow-md shadow-blue-900/5 border border-slate-200/30'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-white/40 border border-transparent'
+            }`}
+          >
+            <Crown className="w-4.5 h-4.5" />
+            Hạng thành viên
           </button>
         </div>
 
@@ -750,7 +763,12 @@ function ProfileContent() {
             )}
           </div>
         )}
-        
+
+        {/* Tab Content: Membership */}
+        {activeTab === 'membership' && session?.user?.id && (
+          <CustomerMembershipCard userId={session.user.id} />
+        )}
+
       </div>
     </div>
   )
