@@ -72,7 +72,7 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 | B2 | Migration: bảng dữ liệu khách (cột profiles, customer_vouchers, customer_gifts, events) | ✅ | `LENH-SQL-...txt` PHẦN 2,3,4 | Đã chạy trên Supabase 2026-06-06 |
 | B3 | Migration: function + trigger tích lũy & thăng hạng (idempotent) | ✅ | `LENH-SQL-...txt` PHẦN 5,6 | Đã chạy. Nên test idempotency khi có dữ liệu thật |
 | B4 | Migration: RLS policies cho mọi bảng mới | ✅ | `LENH-SQL-...txt` PHẦN 7 | Đã chạy trên Supabase 2026-06-06 |
-| B5 | UI admin: cấu hình hạng & quyền lợi | ✅ | 05 | Component MembershipTiersAdmin, tab mới trong /admin |
+| B5 | UI admin: cấu hình hạng & quyền lợi | ✅ | 05 | Component MembershipTiersAdmin, tab mới trong /admin. **CẦN chạy `LENH-SQL-B5-ADMIN-RPC-TIERS.txt` trên Supabase** (RPC ghi config) |
 | B6 | UI admin: cấu hình voucher / quà / mốc thưởng | ⬜ | 05 | |
 | B7 | UI admin: trao hạng/voucher/quà thủ công + audit log | ⬜ | 05 | |
 | B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ⬜ | 06 | |
@@ -146,7 +146,16 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
-- **2026-06-06** — **B5 ✅**: Tạo `src/components/MembershipTiersAdmin.tsx` — quản lý `membership_tiers`: danh sách, thêm/sửa modal, bật/tắt, đổi thứ tự, nút "Áp dụng lại hạng", seed 4 hạng mặc định, validate. Thêm tab "Thành viên" vào `/admin`. Fix tsconfig exclude supabase Deno functions; fix supabase client dùng placeholder khi build. Build ✅. _(by Claude)_
+- **2026-06-06** — **B5 sửa cơ chế ghi (BẢO MẬT)**: phiên local phát hiện bản B5 của routine ghi config
+  **trực tiếp qua anon** (`supabase.from('membership_tiers').insert/update`) → sẽ bị **RLS chặn** (B4 chỉ cho
+  `service_role` ghi) và gọi `recompute_all_tiers` (RPC chưa tồn tại) → UI build xanh nhưng **không chạy thật**,
+  trái thiết kế bảo mật 07 mục 5. Đã chuyển toàn bộ 5 chỗ ghi + đọc của `MembershipTiersAdmin.tsx` sang **RPC
+  SECURITY DEFINER** (`admin_list_tiers/upsert_tier/set_tier_active/reorder_tiers/seed_default_tiers` +
+  `recompute_all_tiers`), RPC tự kiểm admin = email ở `src/proxy.ts` (`/admin` đã được Next 16 `proxy` gate).
+  Quyết định kiến trúc (Quyết uỷ quyền): chọn RPC thay vì service-role API route (1 hop, tối ưu hiệu năng hơn).
+  **➡️ CẦN Quyết chạy `docs/membership/LENH-SQL-B5-ADMIN-RPC-TIERS.txt` trên Supabase** thì B5 mới hoạt động.
+  Build ✅. _(by Claude — phiên local, lưu ý đã xảy ra trùng việc với routine 09:00)_
+- **2026-06-06** — **B5 ✅**: Tạo `src/components/MembershipTiersAdmin.tsx` — quản lý `membership_tiers`: danh sách, thêm/sửa modal, bật/tắt, đổi thứ tự, nút "Áp dụng lại hạng", seed 4 hạng mặc định, validate. Thêm tab "Thành viên" vào `/admin`. Fix tsconfig exclude supabase Deno functions; fix supabase client dùng placeholder khi build. Build ✅. _(by routine)_
 - **2026-06-06** — **B1–B4 ✅**: Quyết đã chạy toàn bộ SQL tầng DB trên Supabase. Bảng/function/trigger/RLS
   đã sẵn sàng. Tiếp theo: UI B5→B13 (admin + khách). _(by Claude)_
 - **2026-06-06** — **B1–B4 (SQL) soạn xong**: gộp toàn bộ tầng DB vào `LENH-SQL-CAN-CHAY-TREN-SUPABASE.txt`

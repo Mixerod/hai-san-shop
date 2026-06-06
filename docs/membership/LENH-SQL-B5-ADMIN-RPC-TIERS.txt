@@ -1,0 +1,188 @@
+================================================================================
+  B5 — RPC ADMIN CHO CẤU HÌNH HẠNG THÀNH VIÊN (membership_tiers)
+  Chạy file này trong Supabase SQL Editor (giống B1–B4).
+  An toàn chạy lại nhiều lần (create or replace).
+================================================================================
+--  BỐI CẢNH KIẾN TRÚC (vì sao cần các RPC này):
+--    • RLS bảng config chỉ cho service_role GHI (PHẦN 7 của file gốc).
+--    • App chỉ có anon browser client (src/lib/supabase.ts) — KHÔNG ghi thẳng được.
+--    • Giải pháp: RPC SECURITY DEFINER tự kiểm "caller là admin" rồi ghi giúp.
+--      → 1 network hop trực tiếp tới Supabase (không thêm server route), RLS vẫn khóa.
+--  ADMIN = đúng email cấu hình ở src/proxy.ts (đã gate /admin). Không thêm bảng admin.
+--------------------------------------------------------------------------------
+
+-- 0) Helper: caller hiện tại có phải admin không (đọc email từ JWT)
+create or replace function public.is_membership_admin()
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce(auth.email() = 'minhquyet08122003@gmail.com', false);
+$$;
+
+-- 1) Liệt kê TẤT CẢ hạng (kể cả is_active=false) — admin cần thấy hạng đang tắt.
+--    (RLS công khai chỉ cho đọc bản is_active=true, nên cần RPC riêng cho admin.)
+create or replace function public.admin_list_tiers()
+returns setof public.membership_tiers
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query select * from public.membership_tiers order by sort_order;
+end;
+$$;
+
+-- 2) Thêm / sửa 1 hạng. p_id NULL = thêm mới; có p_id = cập nhật.
+create or replace function public.admin_upsert_tier(
+  p_id               uuid,
+  p_code             text,
+  p_name             text,
+  p_sort_order       int,
+  p_color            text,
+  p_min_spend        bigint,
+  p_min_kg           numeric,
+  p_threshold_logic  text,
+  p_discount_percent numeric,
+  p_free_ship        boolean,
+  p_perks            jsonb,
+  p_is_active        boolean
+) returns public.membership_tiers
+language plpgsql security definer set search_path = public as $$
+declare v_row public.membership_tiers;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+
+  -- Validate (khớp 05 mục 2): code/name bắt buộc, ngưỡng >=0, discount 0-100, logic hợp lệ.
+  if p_code is null or btrim(p_code) = '' then raise exception 'Mã hạng (code) không được trống'; end if;
+  if p_name is null or btrim(p_name) = '' then raise exception 'Tên hạng không được trống'; end if;
+  if coalesce(p_min_spend, 0) < 0 or coalesce(p_min_kg, 0) < 0 then
+    raise exception 'Ngưỡng tiền/kg phải >= 0';
+  end if;
+  if coalesce(p_discount_percent, 0) < 0 or coalesce(p_discount_percent, 0) > 100 then
+    raise exception 'Giảm giá (%%) phải trong khoảng 0-100';
+  end if;
+  if coalesce(p_threshold_logic, 'or') not in ('or', 'and') then
+    raise exception 'threshold_logic chỉ nhận or | and';
+  end if;
+
+  if p_id is null then
+    insert into public.membership_tiers(
+      code, name, sort_order, color, min_spend, min_kg,
+      threshold_logic, discount_percent, free_ship, perks, is_active)
+    values (
+      btrim(p_code), btrim(p_name), coalesce(p_sort_order, 0), p_color,
+      coalesce(p_min_spend, 0), coalesce(p_min_kg, 0),
+      coalesce(p_threshold_logic, 'or'), coalesce(p_discount_percent, 0),
+      coalesce(p_free_ship, false), coalesce(p_perks, '[]'::jsonb),
+      coalesce(p_is_active, true))
+    returning * into v_row;
+  else
+    update public.membership_tiers set
+      code             = btrim(p_code),
+      name             = btrim(p_name),
+      sort_order       = coalesce(p_sort_order, sort_order),
+      color            = p_color,
+      min_spend        = coalesce(p_min_spend, 0),
+      min_kg           = coalesce(p_min_kg, 0),
+      threshold_logic  = coalesce(p_threshold_logic, 'or'),
+      discount_percent = coalesce(p_discount_percent, 0),
+      free_ship        = coalesce(p_free_ship, false),
+      perks            = coalesce(p_perks, '[]'::jsonb),
+      is_active        = coalesce(p_is_active, is_active),
+      updated_at       = now()
+    where id = p_id
+    returning * into v_row;
+    if not found then raise exception 'Không tìm thấy hạng cần sửa'; end if;
+  end if;
+
+  return v_row;
+end;
+$$;
+
+-- 3) Bật / tắt nhanh 1 hạng (soft toggle, không xóa cứng).
+create or replace function public.admin_set_tier_active(p_id uuid, p_active boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  update public.membership_tiers
+     set is_active = coalesce(p_active, true), updated_at = now()
+   where id = p_id;
+  if not found then raise exception 'Không tìm thấy hạng'; end if;
+end;
+$$;
+
+-- 4) Đổi thứ tự bậc: nhận mảng id theo thứ tự mới -> gán lại sort_order 0,1,2,...
+create or replace function public.admin_reorder_tiers(p_ids uuid[])
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  update public.membership_tiers m
+     set sort_order = ord.so, updated_at = now()
+  from (
+    select id, (ordinality - 1)::int as so
+    from unnest(p_ids) with ordinality as t(id, ordinality)
+  ) ord
+  where m.id = ord.id;
+end;
+$$;
+
+-- 5) Tạo 4 hạng mặc định (cho trạng thái rỗng — 05 mục 7). Chạy lại an toàn.
+create or replace function public.admin_seed_default_tiers()
+returns setof public.membership_tiers
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  insert into public.membership_tiers
+    (code, name, sort_order, color, min_spend, min_kg, discount_percent, free_ship, perks)
+  values
+    ('member',  'Thành viên',      0, '#94a3b8',         0, 0, 0, false, '["Tích lũy để lên hạng"]'),
+    ('silver',  'Khách Bạc',       1, '#c0c0c0',  1000000, 0, 2, false, '["Giảm 2% mọi đơn"]'),
+    ('gold',    'Khách Vàng',      2, '#f59e0b',  5000000, 0, 5, false, '["Giảm 5%","Free ship khu vực Thủ Đức"]'),
+    ('diamond', 'Khách Kim Cương', 3, '#06b6d4', 10000000, 0, 8, true,  '["Giảm 8%","Free ship khu vực Thủ Đức","Ưu tiên VIP"]')
+  on conflict (code) do nothing;
+  return query select * from public.membership_tiers order by sort_order;
+end;
+$$;
+
+-- 6) "Áp dụng lại hạng cho TẤT CẢ khách" (nút chạy nền sau khi đổi ngưỡng — 05 mục 2).
+--    Chỉ động tới khách KHÔNG bị tier_locked. Trả về số khách đổi hạng. Ghi audit.
+create or replace function public.recompute_all_tiers()
+returns int
+language plpgsql security definer set search_path = public as $$
+declare v_changed int := 0; r record; v_new text;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  for r in select id, tier_code from public.profiles where not tier_locked loop
+    v_new := public.compute_tier(r.id);
+    if v_new is not null and v_new is distinct from r.tier_code then
+      update public.profiles set tier_code = v_new, tier_updated_at = now() where id = r.id;
+      insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor)
+      values (r.id, 'tier_recompute', r.tier_code, v_new, coalesce(auth.email(), 'admin'));
+      v_changed := v_changed + 1;
+    end if;
+  end loop;
+  return v_changed;
+end;
+$$;
+
+-- 7) Quyền gọi: các RPC tự kiểm admin bên trong nên chỉ cần cấp cho authenticated.
+grant execute on function public.is_membership_admin()            to authenticated, anon;
+grant execute on function public.admin_list_tiers()               to authenticated;
+grant execute on function public.admin_upsert_tier(uuid,text,text,int,text,bigint,numeric,text,numeric,boolean,jsonb,boolean) to authenticated;
+grant execute on function public.admin_set_tier_active(uuid,boolean) to authenticated;
+grant execute on function public.admin_reorder_tiers(uuid[])       to authenticated;
+grant execute on function public.admin_seed_default_tiers()        to authenticated;
+grant execute on function public.recompute_all_tiers()             to authenticated;
+
+-- DONE. Bước tiếp theo: B6 (voucher/quà/mốc thưởng) sẽ thêm RPC tương tự.

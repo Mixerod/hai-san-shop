@@ -54,60 +54,8 @@ const DEFAULT_FORM: TierFormData = {
   is_active: true,
 };
 
-const SEED_TIERS: TierFormData[] = [
-  {
-    code: "member",
-    name: "Thành viên",
-    sort_order: 0,
-    color: "#6b7280",
-    min_spend: 0,
-    min_kg: 0,
-    threshold_logic: "or",
-    discount_percent: 0,
-    free_ship: false,
-    perks: ["Tích lũy để lên hạng nhận ưu đãi"],
-    is_active: true,
-  },
-  {
-    code: "silver",
-    name: "Khách Bạc",
-    sort_order: 1,
-    color: "#94a3b8",
-    min_spend: 1000000,
-    min_kg: 0,
-    threshold_logic: "or",
-    discount_percent: 2,
-    free_ship: false,
-    perks: ["Giảm 2% mọi đơn", "Voucher định kỳ"],
-    is_active: true,
-  },
-  {
-    code: "gold",
-    name: "Khách Vàng",
-    sort_order: 2,
-    color: "#eab308",
-    min_spend: 5000000,
-    min_kg: 0,
-    threshold_logic: "or",
-    discount_percent: 5,
-    free_ship: false,
-    perks: ["Giảm 5%", "Free ship đơn lớn", "Quà tháng"],
-    is_active: true,
-  },
-  {
-    code: "diamond",
-    name: "Khách Kim Cương",
-    sort_order: 3,
-    color: "#06b6d4",
-    min_spend: 10000000,
-    min_kg: 0,
-    threshold_logic: "or",
-    discount_percent: 8,
-    free_ship: true,
-    perks: ["Giảm 8%", "Free ship", "Quà & ưu tiên VIP"],
-    is_active: true,
-  },
-];
+// 4 hạng mặc định được seed phía DB qua RPC admin_seed_default_tiers()
+// (giá trị chuẩn ở docs/membership/03 mục 7) — không hard-code lại ở client.
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -169,10 +117,9 @@ export default function MembershipTiersAdmin() {
   const fetchTiers = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("membership_tiers")
-        .select("*")
-        .order("sort_order");
+      // Đọc qua RPC admin (SECURITY DEFINER) để thấy cả hạng đang tắt — RLS công khai
+      // chỉ cho đọc is_active=true. RPC tự kiểm caller là admin.
+      const { data, error } = await supabase.rpc("admin_list_tiers");
       if (error) throw error;
       const rows = (data || []) as MembershipTier[];
       setTiers(rows);
@@ -248,18 +195,24 @@ export default function MembershipTiersAdmin() {
     setFormErrors([]);
     setSaving(true);
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from("membership_tiers")
-          .update({ ...data, updated_at: new Date().toISOString() })
-          .eq("id", editingId);
-        if (error) throw error;
-        showToast(`Đã cập nhật hạng "${data.name}"`);
-      } else {
-        const { error } = await supabase.from("membership_tiers").insert([data]);
-        if (error) throw error;
-        showToast(`Đã thêm hạng "${data.name}"`);
-      }
+      // Ghi qua RPC SECURITY DEFINER (RLS chỉ cho service_role ghi config).
+      // p_id null = thêm mới; có id = cập nhật.
+      const { error } = await supabase.rpc("admin_upsert_tier", {
+        p_id: editingId,
+        p_code: data.code,
+        p_name: data.name,
+        p_sort_order: data.sort_order,
+        p_color: data.color,
+        p_min_spend: data.min_spend,
+        p_min_kg: data.min_kg,
+        p_threshold_logic: data.threshold_logic,
+        p_discount_percent: data.discount_percent,
+        p_free_ship: data.free_ship,
+        p_perks: data.perks,
+        p_is_active: data.is_active,
+      });
+      if (error) throw error;
+      showToast(editingId ? `Đã cập nhật hạng "${data.name}"` : `Đã thêm hạng "${data.name}"`);
       closeForm();
       fetchTiers();
     } catch (err: any) {
@@ -273,10 +226,10 @@ export default function MembershipTiersAdmin() {
 
   async function handleToggleActive(tier: MembershipTier) {
     try {
-      const { error } = await supabase
-        .from("membership_tiers")
-        .update({ is_active: !tier.is_active, updated_at: new Date().toISOString() })
-        .eq("id", tier.id);
+      const { error } = await supabase.rpc("admin_set_tier_active", {
+        p_id: tier.id,
+        p_active: !tier.is_active,
+      });
       if (error) throw error;
       showToast(
         tier.is_active ? `Đã tắt hạng "${tier.name}"` : `Đã bật hạng "${tier.name}"`
@@ -295,19 +248,14 @@ export default function MembershipTiersAdmin() {
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= sorted.length) return;
 
-    const other = sorted[swapIdx];
-    const now = new Date().toISOString();
+    // Hoán đổi vị trí rồi gửi mảng id theo thứ tự mới — RPC gán lại sort_order.
+    const reordered = [...sorted];
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
     try {
-      await Promise.all([
-        supabase
-          .from("membership_tiers")
-          .update({ sort_order: other.sort_order, updated_at: now })
-          .eq("id", tier.id),
-        supabase
-          .from("membership_tiers")
-          .update({ sort_order: tier.sort_order, updated_at: now })
-          .eq("id", other.id),
-      ]);
+      const { error } = await supabase.rpc("admin_reorder_tiers", {
+        p_ids: reordered.map((t) => t.id),
+      });
+      if (error) throw error;
       fetchTiers();
     } catch (err: any) {
       showToast("Lỗi đổi thứ tự: " + (err?.message || ""), false);
@@ -337,7 +285,7 @@ export default function MembershipTiersAdmin() {
   async function handleSeedDefaults() {
     setSeeding(true);
     try {
-      const { error } = await supabase.from("membership_tiers").insert(SEED_TIERS);
+      const { error } = await supabase.rpc("admin_seed_default_tiers");
       if (error) throw error;
       showToast("Đã tạo 4 hạng mặc định.");
       fetchTiers();
