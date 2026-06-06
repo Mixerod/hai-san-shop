@@ -79,7 +79,7 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 | B9 | UI khách: ví voucher + áp voucher tại /checkout | ✅ | 06 | Khối C/D ở /profile + chọn/áp voucher ở /checkout. **CẦN chạy `LENH-SQL-B9-CHECKOUT-VOUCHER-RPC.txt` trên Supabase** (RPC `place_order` đặt đơn có voucher) |
 | B10 | Tích hợp giảm giá hạng vào tính tiền đơn | ✅ | 04, 06 | Dòng "Ưu đãi hạng −%" ở /checkout, áp hạng trước voucher (trần 30%). **CẦN chạy `LENH-SQL-B10-CHECKOUT-TIER-DISCOUNT-RPC.txt`** (mở rộng `place_order` — đã gồm B9) |
 | B11 | Test: idempotency, race, duplicate voucher | ⬜ | 07 | |
-| B12 | Soát bảo mật RLS + code review | ⬜ | 07 | |
+| B12 | Soát bảo mật RLS + code review | ✅ | 07 | Review TĨNH PASS, không lỗi CRITICAL/HIGH. Báo cáo: `B12-SOAT-BAO-MAT-CODE-REVIEW.md`. Chạy test THỰC = B11 |
 | B13 | Backfill khách cũ + RPC `merge_guest_orders` (gộp đơn vãng lai khi đăng ký, khớp Tên+SĐT) | ⬜ | 04 (mục 8, 9), 07 | Chạy 1 lần go-live + tích hợp vào `auth/page.tsx` |
 
 > 📌 **Mỗi agent khi hoàn thành một mã việc:** đổi trạng thái ô tương ứng thành ✅, ghi 1 dòng ngày +
@@ -146,6 +146,15 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
+- **2026-06-06** — **B12 ✅ (review tĩnh)**: Soát bảo mật RLS + code review toàn tầng membership
+  (RLS 7 bảng + RPC B5–B10 + client /checkout, /profile) theo checklist `07` mục 7. **Không lỗi
+  CRITICAL/HIGH.** Xác nhận: mọi bảng bật RLS không có `public write`; GHI nhạy cảm qua RPC SECURITY
+  DEFINER kiểm `is_membership_admin()` (= email admin, khớp `src/proxy.ts`); `place_order` tính tiền
+  giảm (hạng + voucher, trần 30%) phía server + voucher used atomic (`where status='active'`,
+  rowCount=1); admin list phân trang; KHÔNG phá luồng guest. Phát hiện chỉ mức LOW/NOTE (place_order
+  chưa lọc `in_stock` — khớp luồng cũ, không hồi quy; luồng đơn không-ưu-đãi vẫn tin client giá —
+  hành vi sẵn có ngoài phạm vi). Báo cáo đầy đủ: `docs/membership/B12-SOAT-BAO-MAT-CODE-REVIEW.md`.
+  **Còn lại để đóng checklist: chạy test THỰC trên Supabase = B11** (idempotency/race/RLS). _(by Claude)_
 - **2026-06-06** — **B10 ✅**: Tích hợp **giảm giá theo HẠNG** vào tính tiền ở `/checkout`.
   Client (`src/app/checkout/page.tsx`) tải `discount_percent` + tên hạng (đọc `membership_tiers` công
   khai theo `tier_code`); tổng kết thêm dòng **"Ưu đãi hạng [Tên] −X%"** rồi **Giảm voucher** rồi
