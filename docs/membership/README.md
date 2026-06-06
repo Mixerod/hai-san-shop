@@ -77,7 +77,7 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 | B7 | UI admin: trao hạng/voucher/quà thủ công + audit log | ✅ | 05 | Tab "Khách hàng" trong "Thành viên & Ưu đãi". **CẦN chạy `LENH-SQL-B7-ADMIN-RPC-MANUAL-GRANT-AUDIT.txt` trên Supabase** (RPC trao/đặt hạng/điều chỉnh + đọc khách/ví/audit) |
 | B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ✅ | 06 | Tab "Thành viên" ở /profile. **KHÔNG cần chạy SQL** — đọc trực tiếp qua RLS (profiles owner-read + membership_tiers công khai) |
 | B9 | UI khách: ví voucher + áp voucher tại /checkout | ✅ | 06 | Khối C/D ở /profile + chọn/áp voucher ở /checkout. **CẦN chạy `LENH-SQL-B9-CHECKOUT-VOUCHER-RPC.txt` trên Supabase** (RPC `place_order` đặt đơn có voucher) |
-| B10 | Tích hợp giảm giá hạng vào tính tiền đơn | ⬜ | 04, 06 | Cẩn thận giá tại checkout |
+| B10 | Tích hợp giảm giá hạng vào tính tiền đơn | ✅ | 04, 06 | Dòng "Ưu đãi hạng −%" ở /checkout, áp hạng trước voucher (trần 30%). **CẦN chạy `LENH-SQL-B10-CHECKOUT-TIER-DISCOUNT-RPC.txt`** (mở rộng `place_order` — đã gồm B9) |
 | B11 | Test: idempotency, race, duplicate voucher | ⬜ | 07 | |
 | B12 | Soát bảo mật RLS + code review | ⬜ | 07 | |
 | B13 | Backfill khách cũ + RPC `merge_guest_orders` (gộp đơn vãng lai khi đăng ký, khớp Tên+SĐT) | ⬜ | 04 (mục 8, 9), 07 | Chạy 1 lần go-live + tích hợp vào `auth/page.tsx` |
@@ -146,6 +146,17 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
+- **2026-06-06** — **B10 ✅**: Tích hợp **giảm giá theo HẠNG** vào tính tiền ở `/checkout`.
+  Client (`src/app/checkout/page.tsx`) tải `discount_percent` + tên hạng (đọc `membership_tiers` công
+  khai theo `tier_code`); tổng kết thêm dòng **"Ưu đãi hạng [Tên] −X%"** rồi **Giảm voucher** rồi
+  **Thành tiền** — **áp hạng TRƯỚC voucher**, trần TỔNG giảm **30%** (CĐ-5). Mở rộng RPC SECURITY
+  DEFINER **`place_order`**: đọc lại GIÁ THẬT + `discount_percent` của hạng phía server, voucher giờ là
+  tham số **TÙY CHỌN** (`p_voucher_id` null = chỉ giảm hạng). Client định tuyến qua RPC khi khách đăng
+  nhập **có giảm hạng HOẶC có voucher**; guest / hội viên hạng 0% & không voucher vẫn đi luồng insert
+  cũ (KHÔNG đổi). Quyền lợi free ship theo hạng = ưu đãi vận chuyển (Thủ Đức) → KHÔNG trừ `total_amount`.
+  **➡️ CẦN Quyết chạy `docs/membership/LENH-SQL-B10-CHECKOUT-TIER-DISCOUNT-RPC.txt` trên Supabase**
+  (file này THAY THẾ `place_order` của B9 — đã gồm cả B9, chỉ cần chạy B10). Build ✅ (TypeScript pass).
+  _(by Claude — phiên local)_
 - **2026-06-06** — **B9 ✅**: UI khách ví voucher + áp voucher khi thanh toán. **(1)** `/profile`
   (`CustomerMembershipCard.tsx`): thêm **Khối C** (ví voucher — khả dụng nổi bật + lịch sử thu gọn,
   đọc `customer_vouchers` owner-read join `voucher_definitions`) + **Khối D** (quà đã nhận, đọc

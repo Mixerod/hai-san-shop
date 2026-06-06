@@ -118,6 +118,10 @@ function CheckoutForm() {
   const [tierCode, setTierCode] = useState<string | null>(null)
   const [vouchers, setVouchers] = useState<CheckoutVoucher[]>([])
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null)
+
+  // B10 — ưu đãi giảm giá theo HẠNG của khách (đọc membership_tiers công khai).
+  const [tierName, setTierName] = useState<string | null>(null)
+  const [tierDiscountPercent, setTierDiscountPercent] = useState<number>(0)
   
   const totalKg = items.reduce((acc, item) => {
     const u = (item.unit || '').toLowerCase()
@@ -247,6 +251,8 @@ function CheckoutForm() {
   useEffect(() => {
     if (!uid) {
       setTierCode(null)
+      setTierName(null)
+      setTierDiscountPercent(0)
       setVouchers([])
       setSelectedVoucherId(null)
       return
@@ -260,9 +266,20 @@ function CheckoutForm() {
         .eq('user_id', uid)
         .eq('status', 'active')
         .order('issued_at', { ascending: false }),
-    ]).then(([profileRes, vouchersRes]) => {
+      supabase.from('membership_tiers').select('code, name, discount_percent'),
+    ]).then(([profileRes, vouchersRes, tiersRes]) => {
       if (!alive) return
-      if (!profileRes.error) setTierCode((profileRes.data?.tier_code as string | null) ?? null)
+      const code = !profileRes.error ? ((profileRes.data?.tier_code as string | null) ?? null) : null
+      setTierCode(code)
+      // B10 — ưu đãi giảm giá theo hạng hiện tại (chỉ để hiển thị; server tính lại).
+      if (!tiersRes.error && code) {
+        const t = (tiersRes.data as Array<Record<string, unknown>> | null)?.find((r) => r.code === code)
+        setTierName((t?.name as string | null) ?? null)
+        setTierDiscountPercent(t ? Number(t.discount_percent ?? 0) : 0)
+      } else {
+        setTierName(null)
+        setTierDiscountPercent(0)
+      }
       if (vouchersRes.error) {
         console.error('Error loading vouchers:', vouchersRes.error)
         setVouchers([])
@@ -320,26 +337,27 @@ function CheckoutForm() {
 
       const finalNote = `Tên: ${name}\nSĐT: ${phone}\nNhận hàng: ${deliveryDetail}\nGhi chú khách: ${note}`
 
-      // B9 — ĐƯỜNG CÓ VOUCHER (chỉ khách đăng nhập): đi qua RPC SECURITY DEFINER `place_order`.
-      // Server đọc lại GIÁ THẬT trong DB, xác thực voucher (sở hữu/active/hạn/min_order/tier_scope),
-      // tính giảm có trần 30% (CĐ-5), tạo order + order_items, và đánh dấu voucher used ATOMIC
+      // B9/B10 — ĐƯỜNG CÓ ƯU ĐÃI (khách đăng nhập + có giảm HẠNG hoặc CÓ voucher):
+      // đi qua RPC SECURITY DEFINER `place_order`. Server đọc lại GIÁ THẬT + % giảm hạng trong DB,
+      // xác thực voucher (sở hữu/active/hạn/min_order/tier_scope), áp hạng trước rồi voucher với
+      // trần 30% (CĐ-5), tạo order + order_items, và đánh dấu voucher used ATOMIC
       // (update ... where status='active', rowCount=1) → chống double-spend. Xem 04 mục 7.
-      if (session?.user?.id && selectedVoucher) {
+      if (session?.user?.id && (selectedVoucher || tierDiscount > 0)) {
         const { data: newOrderId, error: rpcError } = await supabase.rpc('place_order', {
           p_items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
           p_payment_method: paymentMethod,
           p_note: finalNote,
-          p_voucher_id: selectedVoucher.id,
+          p_voucher_id: selectedVoucher?.id ?? null,
         })
         if (rpcError || !newOrderId) {
-          throw new Error(rpcError?.message || 'Không thể đặt hàng với voucher, vui lòng thử lại.')
+          throw new Error(rpcError?.message || 'Không thể đặt hàng với ưu đãi, vui lòng thử lại.')
         }
         clear()
         router.push(`/order-success?id=${newOrderId}`)
         return
       }
 
-      // 1. Insert order — GẮN user_id để lịch sử mua hàng hiển thị đúng (đường KHÔNG voucher / guest)
+      // 1. Insert order — GẮN user_id để lịch sử mua hàng hiển thị đúng (đường KHÔNG ưu đãi / guest)
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -404,9 +422,10 @@ function CheckoutForm() {
     return true
   })
   const selectedVoucher = eligibleVouchers.find((v) => v.id === selectedVoucherId) ?? null
-  // CĐ-5: áp giảm HẠNG trước (B10 — hiện 0) rồi voucher; trần TỔNG giảm = 30% tạm tính.
-  const tierDiscount = 0 // seam B10
+  // CĐ-5: áp giảm HẠNG trước rồi voucher; trần TỔNG giảm = 30% tạm tính.
   const cap = Math.floor(subtotal * DISCOUNT_CAP_RATIO)
+  const rawTierDiscount = Math.floor((subtotal * tierDiscountPercent) / 100)
+  const tierDiscount = Math.max(0, Math.min(rawTierDiscount, cap))
   const voucherDiscount = Math.max(
     0,
     Math.min(rawVoucherDiscount(selectedVoucher?.voucher_definitions ?? null, subtotal), cap - tierDiscount)
@@ -515,19 +534,30 @@ function CheckoutForm() {
               ))}
             </div>
             <div className="border-t border-slate-100 pt-4 space-y-2">
-              {voucherDiscount > 0 ? (
+              {tierDiscount > 0 || voucherDiscount > 0 ? (
                 <>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500">Tạm tính ({totalKg}kg)</span>
                     <span className="font-semibold text-slate-700">{subtotal.toLocaleString('vi-VN')}đ</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-orange-600 font-medium inline-flex items-center gap-1">
-                      <Ticket className="w-3.5 h-3.5" />
-                      Giảm voucher
-                    </span>
-                    <span className="font-semibold text-orange-600">-{voucherDiscount.toLocaleString('vi-VN')}đ</span>
-                  </div>
+                  {tierDiscount > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-emerald-600 font-medium inline-flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5" />
+                        Ưu đãi hạng{tierName ? ` ${tierName}` : ''} −{tierDiscountPercent}%
+                      </span>
+                      <span className="font-semibold text-emerald-600">-{tierDiscount.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  )}
+                  {voucherDiscount > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-orange-600 font-medium inline-flex items-center gap-1">
+                        <Ticket className="w-3.5 h-3.5" />
+                        Giảm voucher
+                      </span>
+                      <span className="font-semibold text-orange-600">-{voucherDiscount.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pt-2 border-t border-dashed border-slate-100">
                     <span className="text-slate-500 text-sm">Thành tiền</span>
                     <span className="text-2xl font-black text-blue-600">{finalAmount.toLocaleString('vi-VN')}đ</span>
