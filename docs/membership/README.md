@@ -68,10 +68,10 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 
 | Mã | Việc | Trạng thái | File hướng dẫn | Ghi chú |
 |----|------|-----------|----------------|---------|
-| B1 | Migration: bảng config (tiers, vouchers, gifts, reward_rules) | 🟡 | `LENH-SQL-...txt` PHẦN 1,8 | SQL soạn xong — **chờ Quyết chạy trên Supabase** |
-| B2 | Migration: bảng dữ liệu khách (cột profiles, customer_vouchers, customer_gifts, events) | 🟡 | `LENH-SQL-...txt` PHẦN 2,3,4 | SQL soạn xong — chờ chạy |
-| B3 | Migration: function + trigger tích lũy & thăng hạng (idempotent) | 🟡 | `LENH-SQL-...txt` PHẦN 5,6 | SQL soạn xong — chờ chạy + test idempotency |
-| B4 | Migration: RLS policies cho mọi bảng mới | 🟡 | `LENH-SQL-...txt` PHẦN 7 | SQL soạn xong — chờ chạy |
+| B1 | Migration: bảng config (tiers, vouchers, gifts, reward_rules) | ✅ | `LENH-SQL-...txt` PHẦN 1,8 | Đã chạy trên Supabase 2026-06-06 |
+| B2 | Migration: bảng dữ liệu khách (cột profiles, customer_vouchers, customer_gifts, events) | ✅ | `LENH-SQL-...txt` PHẦN 2,3,4 | Đã chạy trên Supabase 2026-06-06 |
+| B3 | Migration: function + trigger tích lũy & thăng hạng (idempotent) | ✅ | `LENH-SQL-...txt` PHẦN 5,6 | Đã chạy. Nên test idempotency khi có dữ liệu thật |
+| B4 | Migration: RLS policies cho mọi bảng mới | ✅ | `LENH-SQL-...txt` PHẦN 7 | Đã chạy trên Supabase 2026-06-06 |
 | B5 | UI admin: cấu hình hạng & quyền lợi | ⬜ | 05 | |
 | B6 | UI admin: cấu hình voucher / quà / mốc thưởng | ⬜ | 05 | |
 | B7 | UI admin: trao hạng/voucher/quà thủ công + audit log | ⬜ | 05 | |
@@ -146,6 +146,8 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
+- **2026-06-06** — **B1–B4 ✅**: Quyết đã chạy toàn bộ SQL tầng DB trên Supabase. Bảng/function/trigger/RLS
+  đã sẵn sàng. Tiếp theo: UI B5→B13 (admin + khách). _(by Claude)_
 - **2026-06-06** — **B1–B4 (SQL) soạn xong**: gộp toàn bộ tầng DB vào `LENH-SQL-CAN-CHAY-TREN-SUPABASE.txt`
   (bảng + index + function + trigger + RLS + seed + backfill + merge). Chờ Quyết chạy trên Supabase SQL
   Editor. Tiếp theo: UI B5→B13 sẽ chạy ở session mới qua /schedule. _(by Claude)_

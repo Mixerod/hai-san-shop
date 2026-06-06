@@ -407,8 +407,8 @@ create policy ev_service_write on public.membership_events for all to service_ro
 
 insert into public.membership_tiers (code, name, sort_order, color, min_spend, min_kg, discount_percent, free_ship, perks)
 values
- ('member',  'Thành viên',      0, '#94a3b8',        0, 0, 0, false, '["Tích lũy để lên hạng"]'),
- ('silver',  'Khách Bạc',       1, '#c0c0c0',  1000000, 0, 2, false, '["Giảm 2% mọi đơn"]'),
+ ('member',  'Thành viên',      0, '#94a3b8',        0, 0, 0, false, '["Tích lũy để lên hạng","Free ship khu vực Thủ Đức"]'),
+ ('silver',  'Khách Bạc',       1, '#c0c0c0',  1000000, 0, 2, false, '["Giảm 2% mọi đơn","Free ship khu vực Thủ Đức"]'),
  ('gold',    'Khách Vàng',      2, '#f59e0b',  5000000, 0, 5, false, '["Giảm 5%","Free ship khu vực Thủ Đức"]'),
  ('diamond', 'Khách Kim Cương', 3, '#06b6d4', 10000000, 0, 8, true,  '["Giảm 8%","Free ship khu vực Thủ Đức","Ưu tiên VIP"]')
 on conflict (code) do nothing;
