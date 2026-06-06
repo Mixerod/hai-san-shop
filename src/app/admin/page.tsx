@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import MembershipTiersAdmin from "@/components/MembershipTiersAdmin";
+import MembershipAdmin from "@/components/membership/MembershipAdmin";
 import {
   Package,
   Loader2,
@@ -3106,7 +3106,7 @@ export default function AdminPage() {
 
         {activeTab === 'membership' && (
           <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
-            <MembershipTiersAdmin />
+            <MembershipAdmin />
           </div>
         )}
 

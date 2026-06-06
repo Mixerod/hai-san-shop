@@ -73,7 +73,7 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 | B3 | Migration: function + trigger tích lũy & thăng hạng (idempotent) | ✅ | `LENH-SQL-...txt` PHẦN 5,6 | Đã chạy. Nên test idempotency khi có dữ liệu thật |
 | B4 | Migration: RLS policies cho mọi bảng mới | ✅ | `LENH-SQL-...txt` PHẦN 7 | Đã chạy trên Supabase 2026-06-06 |
 | B5 | UI admin: cấu hình hạng & quyền lợi | ✅ | 05 | Component MembershipTiersAdmin, tab mới trong /admin. **CẦN chạy `LENH-SQL-B5-ADMIN-RPC-TIERS.txt` trên Supabase** (RPC ghi config) |
-| B6 | UI admin: cấu hình voucher / quà / mốc thưởng | ⬜ | 05 | |
+| B6 | UI admin: cấu hình voucher / quà / mốc thưởng | ✅ | 05 | Tab con Voucher/Quà/Mốc thưởng trong "Thành viên & Ưu đãi". **CẦN chạy `LENH-SQL-B6-ADMIN-RPC-VOUCHER-GIFT-RULES.txt` trên Supabase** (RPC ghi config) |
 | B7 | UI admin: trao hạng/voucher/quà thủ công + audit log | ⬜ | 05 | |
 | B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ⬜ | 06 | |
 | B9 | UI khách: ví voucher + áp voucher tại /checkout | ⬜ | 06 | |
@@ -146,6 +146,16 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
+- **2026-06-06** — **B6 ✅**: Thêm 3 tab con cấu hình trong khu "Thành viên & Ưu đãi": **Voucher**
+  (`voucher_definitions`), **Quà tặng** (`gifts`, quản kho theo delta + vô hạn + cảnh báo kho thấp),
+  **Mốc thưởng** (`reward_rules`, wizard "Khi [điều kiện] → tặng [voucher/quà]"). Bọc tất cả vào
+  `src/components/membership/MembershipAdmin.tsx` (thanh tab con; tab "Hạng thành viên" = B5; tab
+  "Khách hàng" để disabled chờ B7). `/admin` nay render `MembershipAdmin` thay cho `MembershipTiersAdmin`.
+  Mọi GHI đi qua **RPC SECURITY DEFINER** (admin_list/upsert/set_active + adjust/set_unlimited cho kho),
+  RPC tự kiểm admin qua `is_membership_admin()` (đã có từ B5). Primitives dùng chung ở
+  `src/components/membership/ui.tsx`. **➡️ CẦN Quyết chạy
+  `docs/membership/LENH-SQL-B6-ADMIN-RPC-VOUCHER-GIFT-RULES.txt` trên Supabase** thì B6 mới hoạt động.
+  Build ✅ (TypeScript pass). _(by Claude — phiên local)_
 - **2026-06-06** — **B5 sửa cơ chế ghi (BẢO MẬT)**: phiên local phát hiện bản B5 của routine ghi config
   **trực tiếp qua anon** (`supabase.from('membership_tiers').insert/update`) → sẽ bị **RLS chặn** (B4 chỉ cho
   `service_role` ghi) và gọi `recompute_all_tiers` (RPC chưa tồn tại) → UI build xanh nhưng **không chạy thật**,

@@ -1,0 +1,433 @@
+================================================================================
+  B6 — RPC ADMIN CHO VOUCHER / QUÀ TẶNG / MỐC THƯỞNG
+       (voucher_definitions, gifts, reward_rules)
+  Chạy file này trong Supabase SQL Editor (giống B1–B5).
+  An toàn chạy lại nhiều lần (create or replace).
+================================================================================
+--  BỐI CẢNH KIẾN TRÚC (vì sao cần các RPC này) — GIỐNG B5:
+--    • RLS bảng config chỉ cho service_role GHI (PHẦN 7 của file gốc B1–B4).
+--    • App chỉ có anon browser client (src/lib/supabase.ts) — KHÔNG ghi thẳng được.
+--    • Giải pháp: RPC SECURITY DEFINER tự kiểm "caller là admin" rồi ghi giúp.
+--      → 1 network hop trực tiếp tới Supabase (không thêm server route), RLS vẫn khóa.
+--  ADMIN = đúng email cấu hình ở src/proxy.ts (đã gate /admin). Không thêm bảng admin.
+--  Hàm public.is_membership_admin() đã được tạo ở file B5 — KHÔNG tạo lại ở đây.
+--  Soft-delete: mọi "xóa" voucher/quà/luật đều dùng is_active=false (05 mục 3,4,5)
+--  để không phá FK đã tham chiếu (reward_rules -> voucher/gift; customer_* -> def).
+--------------------------------------------------------------------------------
+
+-- ============================================================================
+--  PHẦN A — VOUCHER (voucher_definitions)        [05 mục 3]
+-- ============================================================================
+
+-- A1) Liệt kê TẤT CẢ voucher (kể cả is_active=false) + thống kê đã phát/đã dùng.
+--     issued_count = số bản ghi customer_vouchers đã phát từ định nghĩa này.
+--     used_count   = số bản ghi đã dùng (status='used').
+create or replace function public.admin_list_vouchers()
+returns table (
+  id             uuid,
+  code           text,
+  name           text,
+  type           text,
+  value          numeric,
+  max_discount   bigint,
+  min_order      bigint,
+  min_kg         numeric,
+  tier_scope     text[],
+  per_user_limit int,
+  valid_from     timestamptz,
+  valid_to       timestamptz,
+  is_active      boolean,
+  created_at     timestamptz,
+  issued_count   bigint,
+  used_count     bigint
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query
+    select v.id, v.code, v.name, v.type, v.value, v.max_discount, v.min_order,
+           v.min_kg, v.tier_scope, v.per_user_limit, v.valid_from, v.valid_to,
+           v.is_active, v.created_at,
+           coalesce(c.issued, 0) as issued_count,
+           coalesce(c.used, 0)   as used_count
+    from public.voucher_definitions v
+    left join (
+      select voucher_def_id,
+             count(*)                                  as issued,
+             count(*) filter (where status = 'used')   as used
+      from public.customer_vouchers
+      group by voucher_def_id
+    ) c on c.voucher_def_id = v.id
+    order by v.created_at desc;
+end;
+$$;
+
+-- A2) Thêm / sửa 1 voucher. p_id NULL = thêm mới; có p_id = cập nhật.
+create or replace function public.admin_upsert_voucher(
+  p_id             uuid,
+  p_code           text,
+  p_name           text,
+  p_type           text,
+  p_value          numeric,
+  p_max_discount   bigint,
+  p_min_order      bigint,
+  p_min_kg         numeric,
+  p_tier_scope     text[],
+  p_per_user_limit int,
+  p_valid_from     timestamptz,
+  p_valid_to       timestamptz,
+  p_is_active      boolean
+) returns public.voucher_definitions
+language plpgsql security definer set search_path = public as $$
+declare v_row public.voucher_definitions;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+
+  -- Validate (khớp 05 mục 3): name bắt buộc; type hợp lệ; percent<=100; fixed>0;
+  -- valid_from < valid_to (nếu cả hai có); code không trùng.
+  if p_name is null or btrim(p_name) = '' then raise exception 'Tên voucher không được trống'; end if;
+  if coalesce(p_type, '') not in ('percent','fixed','free_ship') then
+    raise exception 'Loại voucher chỉ nhận percent | fixed | free_ship';
+  end if;
+  if p_type = 'percent' and (coalesce(p_value,0) <= 0 or coalesce(p_value,0) > 100) then
+    raise exception 'Voucher percent: giá trị phải trong khoảng 0-100';
+  end if;
+  if p_type = 'fixed' and coalesce(p_value,0) <= 0 then
+    raise exception 'Voucher fixed: số tiền giảm phải > 0';
+  end if;
+  if coalesce(p_min_order,0) < 0 or coalesce(p_min_kg,0) < 0 then
+    raise exception 'Đơn tối thiểu / kg tối thiểu phải >= 0';
+  end if;
+  if p_valid_from is not null and p_valid_to is not null and p_valid_from >= p_valid_to then
+    raise exception 'Hạn bắt đầu phải trước hạn kết thúc';
+  end if;
+  if p_code is not null and btrim(p_code) <> '' and exists (
+    select 1 from public.voucher_definitions
+    where code = btrim(p_code) and (p_id is null or id <> p_id)
+  ) then
+    raise exception 'Mã voucher (code) đã tồn tại';
+  end if;
+
+  if p_id is null then
+    insert into public.voucher_definitions(
+      code, name, type, value, max_discount, min_order, min_kg,
+      tier_scope, per_user_limit, valid_from, valid_to, is_active)
+    values (
+      nullif(btrim(coalesce(p_code,'')), ''), btrim(p_name), p_type,
+      coalesce(p_value,0), p_max_discount, coalesce(p_min_order,0), coalesce(p_min_kg,0),
+      p_tier_scope, coalesce(p_per_user_limit,1), p_valid_from, p_valid_to,
+      coalesce(p_is_active,true))
+    returning * into v_row;
+  else
+    update public.voucher_definitions set
+      code           = nullif(btrim(coalesce(p_code,'')), ''),
+      name           = btrim(p_name),
+      type           = p_type,
+      value          = coalesce(p_value,0),
+      max_discount   = p_max_discount,
+      min_order      = coalesce(p_min_order,0),
+      min_kg         = coalesce(p_min_kg,0),
+      tier_scope     = p_tier_scope,
+      per_user_limit = coalesce(p_per_user_limit,1),
+      valid_from     = p_valid_from,
+      valid_to       = p_valid_to,
+      is_active      = coalesce(p_is_active, is_active)
+    where id = p_id
+    returning * into v_row;
+    if not found then raise exception 'Không tìm thấy voucher cần sửa'; end if;
+  end if;
+
+  return v_row;
+end;
+$$;
+
+-- A3) Bật / tắt voucher (soft, KHÔNG xóa cứng — 05 mục 3 cảnh báo FK).
+create or replace function public.admin_set_voucher_active(p_id uuid, p_active boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  update public.voucher_definitions set is_active = coalesce(p_active, true) where id = p_id;
+  if not found then raise exception 'Không tìm thấy voucher'; end if;
+end;
+$$;
+
+-- ============================================================================
+--  PHẦN B — QUÀ TẶNG (gifts)                      [05 mục 4]
+-- ============================================================================
+
+-- B1) Liệt kê TẤT CẢ quà (kể cả is_active=false) + số đã phát (customer_gifts).
+create or replace function public.admin_list_gifts()
+returns table (
+  id            uuid,
+  name          text,
+  description   text,
+  image_url     text,
+  stock         int,
+  is_active     boolean,
+  created_at    timestamptz,
+  granted_count bigint
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query
+    select g.id, g.name, g.description, g.image_url, g.stock, g.is_active, g.created_at,
+           coalesce(c.granted, 0) as granted_count
+    from public.gifts g
+    left join (
+      select gift_id, count(*) as granted
+      from public.customer_gifts group by gift_id
+    ) c on c.gift_id = g.id
+    order by g.created_at desc;
+end;
+$$;
+
+-- B2) Thêm / sửa quà. Khi SỬA, KHÔNG đụng tới stock (tránh race khi đang phát) —
+--     đổi kho qua admin_adjust_gift_stock / admin_set_gift_unlimited (05 mục 4).
+create or replace function public.admin_upsert_gift(
+  p_id          uuid,
+  p_name        text,
+  p_description text,
+  p_image_url   text,
+  p_stock       int,       -- chỉ dùng khi TẠO MỚI (p_id null)
+  p_is_active   boolean
+) returns public.gifts
+language plpgsql security definer set search_path = public as $$
+declare v_row public.gifts;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  if p_name is null or btrim(p_name) = '' then raise exception 'Tên quà không được trống'; end if;
+  -- stock: -1 = vô hạn, hoặc số >= 0
+  if coalesce(p_stock, 0) < -1 then raise exception 'Tồn kho không hợp lệ'; end if;
+
+  if p_id is null then
+    insert into public.gifts(name, description, image_url, stock, is_active)
+    values (btrim(p_name), p_description, p_image_url, coalesce(p_stock,0), coalesce(p_is_active,true))
+    returning * into v_row;
+  else
+    update public.gifts set
+      name        = btrim(p_name),
+      description  = p_description,
+      image_url    = p_image_url,
+      is_active    = coalesce(p_is_active, is_active)
+      -- stock KHÔNG cập nhật ở đây (xem B3/B4)
+    where id = p_id
+    returning * into v_row;
+    if not found then raise exception 'Không tìm thấy quà cần sửa'; end if;
+  end if;
+  return v_row;
+end;
+$$;
+
+-- B3) Nhập / điều chỉnh kho theo DELTA (an toàn race — 05 mục 4: stock = stock + delta).
+--     Bỏ qua nếu quà đang để VÔ HẠN (stock = -1). Trả về tồn kho mới.
+create or replace function public.admin_adjust_gift_stock(p_id uuid, p_delta int)
+returns int
+language plpgsql security definer set search_path = public as $$
+declare v_stock int;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  select stock into v_stock from public.gifts where id = p_id for update;
+  if not found then raise exception 'Không tìm thấy quà'; end if;
+  if v_stock = -1 then
+    return -1; -- vô hạn: không cộng/trừ
+  end if;
+  update public.gifts
+     set stock = greatest(0, stock + coalesce(p_delta, 0))
+   where id = p_id
+   returning stock into v_stock;
+  return v_stock;
+end;
+$$;
+
+-- B4) Đặt / huỷ chế độ kho VÔ HẠN. unlimited=true -> stock=-1; false -> stock=0.
+create or replace function public.admin_set_gift_unlimited(p_id uuid, p_unlimited boolean)
+returns int
+language plpgsql security definer set search_path = public as $$
+declare v_stock int;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  update public.gifts set stock = case when coalesce(p_unlimited,false) then -1 else 0 end
+   where id = p_id returning stock into v_stock;
+  if not found then raise exception 'Không tìm thấy quà'; end if;
+  return v_stock;
+end;
+$$;
+
+-- B5) Bật / tắt quà (soft).
+create or replace function public.admin_set_gift_active(p_id uuid, p_active boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  update public.gifts set is_active = coalesce(p_active, true) where id = p_id;
+  if not found then raise exception 'Không tìm thấy quà'; end if;
+end;
+$$;
+
+-- ============================================================================
+--  PHẦN C — MỐC THƯỞNG (reward_rules)            [05 mục 5]
+-- ============================================================================
+
+-- C1) Liệt kê TẤT CẢ luật + tên voucher/quà tham chiếu + số lần đã kích hoạt
+--     (đếm customer_vouchers & customer_gifts theo source_rule_id).
+create or replace function public.admin_list_reward_rules()
+returns table (
+  id               uuid,
+  name             text,
+  condition_type   text,
+  threshold        numeric,
+  reward_type      text,
+  voucher_def_id   uuid,
+  gift_id          uuid,
+  tier_scope       text[],
+  is_active        boolean,
+  valid_from       timestamptz,
+  valid_to         timestamptz,
+  created_at       timestamptz,
+  voucher_name     text,
+  gift_name        text,
+  activation_count bigint
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query
+    select r.id, r.name, r.condition_type, r.threshold, r.reward_type,
+           r.voucher_def_id, r.gift_id, r.tier_scope, r.is_active,
+           r.valid_from, r.valid_to, r.created_at,
+           v.name as voucher_name,
+           g.name as gift_name,
+           ( coalesce((select count(*) from public.customer_vouchers cv where cv.source_rule_id = r.id), 0)
+           + coalesce((select count(*) from public.customer_gifts   cg where cg.source_rule_id = r.id), 0)
+           ) as activation_count
+    from public.reward_rules r
+    left join public.voucher_definitions v on v.id = r.voucher_def_id
+    left join public.gifts g               on g.id = r.gift_id
+    order by r.created_at desc;
+end;
+$$;
+
+-- C2) Thêm / sửa luật. p_id NULL = thêm mới.
+create or replace function public.admin_upsert_reward_rule(
+  p_id             uuid,
+  p_name           text,
+  p_condition_type text,
+  p_threshold      numeric,
+  p_reward_type    text,
+  p_voucher_def_id uuid,
+  p_gift_id        uuid,
+  p_tier_scope     text[],
+  p_valid_from     timestamptz,
+  p_valid_to       timestamptz,
+  p_is_active      boolean
+) returns public.reward_rules
+language plpgsql security definer set search_path = public as $$
+declare v_row public.reward_rules;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+
+  -- Validate (khớp 05 mục 5): name bắt buộc; condition/reward hợp lệ; threshold>0;
+  -- reward=voucher bắt buộc voucher_def; reward=gift bắt buộc gift.
+  if p_name is null or btrim(p_name) = '' then raise exception 'Tên luật không được trống'; end if;
+  if coalesce(p_condition_type,'') not in
+     ('order_amount_gte','order_kg_gte','cumulative_spend_gte','cumulative_kg_gte') then
+    raise exception 'Loại điều kiện không hợp lệ';
+  end if;
+  if coalesce(p_threshold,0) <= 0 then raise exception 'Ngưỡng (threshold) phải > 0'; end if;
+  if coalesce(p_reward_type,'') not in ('voucher','gift') then
+    raise exception 'Loại phần thưởng chỉ nhận voucher | gift';
+  end if;
+  if p_reward_type = 'voucher' and p_voucher_def_id is null then
+    raise exception 'Phần thưởng voucher: phải chọn 1 voucher';
+  end if;
+  if p_reward_type = 'gift' and p_gift_id is null then
+    raise exception 'Phần thưởng quà: phải chọn 1 quà';
+  end if;
+  if p_valid_from is not null and p_valid_to is not null and p_valid_from >= p_valid_to then
+    raise exception 'Hạn bắt đầu phải trước hạn kết thúc';
+  end if;
+
+  if p_id is null then
+    insert into public.reward_rules(
+      name, condition_type, threshold, reward_type, voucher_def_id, gift_id,
+      tier_scope, is_active, valid_from, valid_to)
+    values (
+      btrim(p_name), p_condition_type, p_threshold, p_reward_type,
+      case when p_reward_type = 'voucher' then p_voucher_def_id else null end,
+      case when p_reward_type = 'gift'    then p_gift_id        else null end,
+      p_tier_scope, coalesce(p_is_active,true), p_valid_from, p_valid_to)
+    returning * into v_row;
+  else
+    update public.reward_rules set
+      name           = btrim(p_name),
+      condition_type = p_condition_type,
+      threshold      = p_threshold,
+      reward_type    = p_reward_type,
+      voucher_def_id = case when p_reward_type = 'voucher' then p_voucher_def_id else null end,
+      gift_id        = case when p_reward_type = 'gift'    then p_gift_id        else null end,
+      tier_scope     = p_tier_scope,
+      is_active      = coalesce(p_is_active, is_active),
+      valid_from     = p_valid_from,
+      valid_to       = p_valid_to
+    where id = p_id
+    returning * into v_row;
+    if not found then raise exception 'Không tìm thấy luật cần sửa'; end if;
+  end if;
+
+  return v_row;
+end;
+$$;
+
+-- C3) Bật / tắt luật (soft).
+create or replace function public.admin_set_reward_rule_active(p_id uuid, p_active boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  update public.reward_rules set is_active = coalesce(p_active, true) where id = p_id;
+  if not found then raise exception 'Không tìm thấy luật'; end if;
+end;
+$$;
+
+-- ============================================================================
+--  PHẦN D — QUYỀN GỌI (các RPC tự kiểm admin bên trong → chỉ cấp authenticated)
+-- ============================================================================
+grant execute on function public.admin_list_vouchers()                                                              to authenticated;
+grant execute on function public.admin_upsert_voucher(uuid,text,text,text,numeric,bigint,bigint,numeric,text[],int,timestamptz,timestamptz,boolean) to authenticated;
+grant execute on function public.admin_set_voucher_active(uuid,boolean)                                             to authenticated;
+
+grant execute on function public.admin_list_gifts()                                                                 to authenticated;
+grant execute on function public.admin_upsert_gift(uuid,text,text,text,int,boolean)                                 to authenticated;
+grant execute on function public.admin_adjust_gift_stock(uuid,int)                                                  to authenticated;
+grant execute on function public.admin_set_gift_unlimited(uuid,boolean)                                             to authenticated;
+grant execute on function public.admin_set_gift_active(uuid,boolean)                                                to authenticated;
+
+grant execute on function public.admin_list_reward_rules()                                                          to authenticated;
+grant execute on function public.admin_upsert_reward_rule(uuid,text,text,numeric,text,uuid,uuid,text[],timestamptz,timestamptz,boolean) to authenticated;
+grant execute on function public.admin_set_reward_rule_active(uuid,boolean)                                         to authenticated;
+
+-- DONE. Bước tiếp theo: B7 (trao thủ công + audit log) sẽ thêm RPC admin_grant_*.
