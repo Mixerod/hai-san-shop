@@ -78,9 +78,9 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 | B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ✅ | 06 | Tab "Thành viên" ở /profile. **KHÔNG cần chạy SQL** — đọc trực tiếp qua RLS (profiles owner-read + membership_tiers công khai) |
 | B9 | UI khách: ví voucher + áp voucher tại /checkout | ✅ | 06 | Khối C/D ở /profile + chọn/áp voucher ở /checkout. **CẦN chạy `LENH-SQL-B9-CHECKOUT-VOUCHER-RPC.txt` trên Supabase** (RPC `place_order` đặt đơn có voucher) |
 | B10 | Tích hợp giảm giá hạng vào tính tiền đơn | ✅ | 04, 06 | Dòng "Ưu đãi hạng −%" ở /checkout, áp hạng trước voucher (trần 30%). **CẦN chạy `LENH-SQL-B10-CHECKOUT-TIER-DISCOUNT-RPC.txt`** (mở rộng `place_order` — đã gồm B9) |
-| B11 | Test: idempotency, race, duplicate voucher | ⬜ | 07 | |
+| B11 | Test: idempotency, race, duplicate voucher | ✅ | 07 | Bộ 8 kịch bản test soạn xong: `LENH-SQL-B11-TEST-KICH-BAN.txt`. **CẦN Quyết chạy trên Supabase** (BEGIN/ROLLBACK an toàn) & ghi kết quả PASS/FAIL |
 | B12 | Soát bảo mật RLS + code review | ✅ | 07 | Review TĨNH PASS, không lỗi CRITICAL/HIGH. Báo cáo: `B12-SOAT-BAO-MAT-CODE-REVIEW.md`. Chạy test THỰC = B11 |
-| B13 | Backfill khách cũ + RPC `merge_guest_orders` (gộp đơn vãng lai khi đăng ký, khớp Tên+SĐT) | ⬜ | 04 (mục 8, 9), 07 | Chạy 1 lần go-live + tích hợp vào `auth/page.tsx` |
+| B13 | Backfill khách cũ + RPC `merge_guest_orders` (gộp đơn vãng lai, khớp Tên+SĐT) | ✅ | 04 (mục 8, 9), 07 | SQL: `LENH-SQL-B13-BACKFILL-MERGE.txt` (backfill 1 lần go-live + RPC). UI: nút "Gộp đơn cũ của tôi" ở /profile (KHÔNG đụng luồng đăng ký — đăng ký không thu Tên/SĐT). **CẦN chạy SQL trên Supabase** |
 
 > 📌 **Mỗi agent khi hoàn thành một mã việc:** đổi trạng thái ô tương ứng thành ✅, ghi 1 dòng ngày +
 > tóm tắt vào `## 6. NHẬT KÝ` phía dưới, rồi commit. Đừng để bảng này lệch với thực tế.
@@ -146,6 +146,25 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
+- **2026-06-06** — **B13 ✅**: Backfill khách cũ + gộp đơn vãng lai. **(SQL)**
+  `LENH-SQL-B13-BACKFILL-MERGE.txt`: PHẦN A backfill 1 lần (set tích lũy TUYỆT ĐỐI từ đơn `done` +
+  set hạng + đánh dấu `rewards_processed_at` đơn cũ để KHÔNG phát thưởng hồi tố, bọc BEGIN/COMMIT);
+  PHẦN B RPC SECURITY DEFINER `merge_guest_orders(p_name,p_phone)` — gán `user_id` cho đơn
+  `user_id IS NULL` khớp **Tên + SĐT chuẩn hóa** (SĐT ≥ 9 số, parse từ `orders.note`), set tích lũy
+  tuyệt đối + áp lại hạng (nếu không khóa), ghi event `merge_guest_orders`; grant authenticated.
+  **(UI)** `CustomerMembershipCard.tsx` thêm **Khối E** "Gộp đơn cũ của tôi" ở tab Thành viên /profile:
+  khách nhập/xác nhận Tên+SĐT (prefill từ profile owner-read) rồi bấm gộp → gọi RPC, thành công thì
+  reload thẻ (refreshTick). **Quyết định UX (Quyết chốt phiên này):** đặt nút ở **/profile** thay vì
+  auto lúc đăng ký — vì form đăng ký KHÔNG thu Tên/SĐT nên không có gì để khớp; nút xác nhận cũng giảm
+  rủi ro khớp sai (07 mục 6). **➡️ CẦN Quyết chạy `LENH-SQL-B13-BACKFILL-MERGE.txt`** (PHẦN A 1 lần
+  go-live, off-peak; PHẦN B tạo RPC). Build ✅. _(by Claude — phiên local)_
+- **2026-06-06** — **B11 ✅ (bộ test)**: Soạn `LENH-SQL-B11-TEST-KICH-BAN.txt` — 8 kịch bản chạy tay
+  trên Supabase (phần lớn bọc BEGIN/ROLLBACK, an toàn không bẩn dữ liệu): (1) idempotency
+  `process_order_rewards` ×3, (2) trigger chỉ bắt cạnh done, (3) double-spend voucher qua `place_order`,
+  (4) RLS chặn khách thường GHI cấu hình/ví, (5) RLS chặn ĐỌC ví người khác, (6) tồn kho quà không âm,
+  (7) `compute_tier` đúng ngưỡng CĐ-7, (8) trần tổng giảm 30% CĐ-5. Có hướng dẫn giả lập đăng nhập
+  (`set role authenticated` + jwt claims) để test RLS/place_order. **➡️ CẦN Quyết chạy & ghi PASS/FAIL.**
+  _(by Claude — phiên local)_
 - **2026-06-06** — **B12 ✅ (review tĩnh)**: Soát bảo mật RLS + code review toàn tầng membership
   (RLS 7 bảng + RPC B5–B10 + client /checkout, /profile) theo checklist `07` mục 7. **Không lỗi
   CRITICAL/HIGH.** Xác nhận: mọi bảng bật RLS không có `public write`; GHI nhạy cảm qua RPC SECURITY

@@ -1,0 +1,245 @@
+================================================================================
+  B11 — BỘ KỊCH BẢN TEST (idempotency / race / double-spend / RLS / tồn kho)
+        Chạy trong Supabase SQL Editor. AN TOÀN: phần lớn bọc BEGIN ... ROLLBACK
+        nên KHÔNG để lại thay đổi. Đọc kỹ ghi chú từng test trước khi chạy.
+================================================================================
+--  CÁCH DÙNG:
+--    • Mỗi TEST là 1 khối độc lập. Bôi đen đúng khối rồi Run.
+--    • Thay các chỗ <<...>> bằng id/email thật trong DB của bạn.
+--    • Khối có ROLLBACK ở cuối → chạy xong DB trở về như cũ (test không bẩn dữ liệu).
+--    • Mẹo lấy id test nhanh:
+--        select id, user_id, status, total_amount from public.orders
+--        where user_id is not null and status='done' order by created_at desc limit 5;
+--        select id, email, tier_code, lifetime_spend from public.profiles limit 5;
+--
+--  GIẢ LẬP ĐĂNG NHẬP (để test RLS & place_order — vì SQL editor mặc định chạy quyền cao):
+--    set local role authenticated;
+--    select set_config('request.jwt.claims',
+--           json_build_object('sub','<<USER_UUID>>','email','<<EMAIL>>','role','authenticated')::text, true);
+--    → sau đó auth.uid()/auth.email() trả đúng user giả lập. Chỉ có hiệu lực trong transaction.
+--------------------------------------------------------------------------------
+
+
+-- ============================================================================
+-- TEST 1 — IDEMPOTENCY: process_order_rewards gọi 3 lần → tích lũy CHỈ tăng 1 lần
+--   Kỳ vọng: lifetime_spend sau = trước + total_amount (CHỈ 1 lần), dù gọi 3 lần.
+--   Cần 1 đơn done CHƯA xử lý thưởng (rewards_processed_at IS NULL) của 1 user.
+-- ============================================================================
+begin;
+do $$
+declare
+  v_order  uuid := '<<ORDER_ID_DONE_CHUA_XU_LY>>';  -- order.status='done' & rewards_processed_at IS NULL
+  v_user   uuid;
+  v_before bigint;
+  v_after  bigint;
+  v_amount bigint;
+begin
+  select user_id, total_amount into v_user, v_amount from public.orders where id = v_order;
+  select lifetime_spend into v_before from public.profiles where id = v_user;
+
+  perform public.process_order_rewards(v_order);
+  perform public.process_order_rewards(v_order);   -- gọi lại
+  perform public.process_order_rewards(v_order);   -- gọi lại lần 3
+
+  select lifetime_spend into v_after from public.profiles where id = v_user;
+
+  raise notice 'TEST1 spend trước=%, sau=%, +đơn=%', v_before, v_after, v_amount;
+  if v_after = v_before + v_amount then
+    raise notice 'TEST1 ✅ PASS — chỉ cộng 1 lần dù gọi 3 lần (idempotent)';
+  else
+    raise warning 'TEST1 ❌ FAIL — tích lũy bị cộng sai (kỳ vọng %, thực %)', v_before + v_amount, v_after;
+  end if;
+end $$;
+rollback;   -- không lưu thay đổi
+
+
+-- ============================================================================
+-- TEST 2 — TRIGGER chỉ bắt CHUYỂN-CẠNH: set done→done lần nữa KHÔNG phát lại
+--   Mô phỏng: đơn đã done & đã xử lý. Update status='done' lần nữa → không đổi tích lũy.
+-- ============================================================================
+begin;
+do $$
+declare
+  v_order  uuid := '<<ORDER_ID_DA_DONE>>';
+  v_user   uuid;
+  v_before bigint; v_after bigint;
+begin
+  select user_id into v_user from public.orders where id = v_order;
+  select lifetime_spend into v_before from public.profiles where id = v_user;
+
+  update public.orders set status = 'done' where id = v_order;  -- done -> done (không phải cạnh)
+
+  select lifetime_spend into v_after from public.profiles where id = v_user;
+  if v_after = v_before then
+    raise notice 'TEST2 ✅ PASS — set done lại không phát thêm (spend giữ nguyên %)', v_after;
+  else
+    raise warning 'TEST2 ❌ FAIL — spend đổi từ % sang %', v_before, v_after;
+  end if;
+end $$;
+rollback;
+
+
+-- ============================================================================
+-- TEST 3 — DOUBLE-SPEND voucher qua place_order (cập nhật có điều kiện + rowCount)
+--   Kỳ vọng: lần 1 đặt đơn OK + voucher -> 'used'; lần 2 dùng lại voucher đó -> RAISE.
+--   Giả lập đăng nhập user sở hữu voucher. Bọc ROLLBACK.
+-- ============================================================================
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',
+       json_build_object('sub','<<USER_UUID>>','email','<<EMAIL>>','role','authenticated')::text, true);
+do $$
+declare
+  v_voucher uuid := '<<CUSTOMER_VOUCHER_ID_ACTIVE>>'; -- voucher 'active' của user trên, đủ min_order
+  v_items   jsonb := jsonb_build_array(
+              jsonb_build_object('product_id','<<PRODUCT_ID>>','quantity', 3));  -- chỉnh để đạt min_order
+  v_o1 uuid; v_st text;
+begin
+  -- Lần 1: phải thành công và voucher -> used
+  v_o1 := public.place_order(v_items, 'cod', 'TEST3 lần 1', v_voucher);
+  select status into v_st from public.customer_vouchers where id = v_voucher;
+  if v_o1 is not null and v_st = 'used' then
+    raise notice 'TEST3a ✅ PASS — đặt đơn lần 1 OK, voucher -> used';
+  else
+    raise warning 'TEST3a ❌ FAIL — order=%, voucher status=%', v_o1, v_st;
+  end if;
+
+  -- Lần 2: dùng lại voucher đã used → phải raise
+  begin
+    perform public.place_order(v_items, 'cod', 'TEST3 lần 2', v_voucher);
+    raise warning 'TEST3b ❌ FAIL — lẽ ra phải bị từ chối (double-spend)';
+  exception when others then
+    raise notice 'TEST3b ✅ PASS — bị chặn dùng lại: %', sqlerrm;
+  end;
+end $$;
+rollback;
+
+
+-- ============================================================================
+-- TEST 4 — BẢO MẬT RLS: khách thường KHÔNG ghi được bảng cấu hình / ví
+--   Kỳ vọng: insert customer_vouchers & update membership_tiers đều bị chặn.
+-- ============================================================================
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',
+       json_build_object('sub','<<USER_UUID>>','email','<<EMAIL_KHACH_THUONG>>','role','authenticated')::text, true);
+do $$
+begin
+  -- 4a) Tự phát voucher cho mình → phải bị RLS chặn
+  begin
+    insert into public.customer_vouchers(user_id, voucher_def_id, source, status)
+    values ('<<USER_UUID>>', '<<VOUCHER_DEF_ID>>', 'manual', 'active');
+    raise warning 'TEST4a ❌ FAIL — khách TỰ phát được voucher (RLS hở!)';
+  exception when others then
+    raise notice 'TEST4a ✅ PASS — bị chặn ghi customer_vouchers: %', sqlerrm;
+  end;
+
+  -- 4b) Tự sửa cấu hình hạng → phải bị chặn
+  begin
+    update public.membership_tiers set discount_percent = 99 where code = 'member';
+    if found then raise warning 'TEST4b ❌ FAIL — khách sửa được membership_tiers (RLS hở!)';
+    else raise notice 'TEST4b ✅ PASS — update không tác động hàng nào (bị RLS lọc)'; end if;
+  exception when others then
+    raise notice 'TEST4b ✅ PASS — bị chặn ghi membership_tiers: %', sqlerrm;
+  end;
+end $$;
+rollback;
+
+
+-- ============================================================================
+-- TEST 5 — RLS đọc: khách KHÔNG đọc được ví của người KHÁC
+--   Kỳ vọng: chỉ thấy voucher của chính mình; query ví user khác trả 0 dòng.
+-- ============================================================================
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',
+       json_build_object('sub','<<USER_A_UUID>>','email','<<EMAIL_A>>','role','authenticated')::text, true);
+do $$
+declare v_mine int; v_others int;
+begin
+  select count(*) into v_mine   from public.customer_vouchers where user_id = '<<USER_A_UUID>>';
+  select count(*) into v_others from public.customer_vouchers where user_id = '<<USER_B_UUID>>';
+  raise notice 'TEST5 — ví của mình thấy % dòng, ví user B thấy % dòng (kỳ vọng 0)', v_mine, v_others;
+  if v_others = 0 then raise notice 'TEST5 ✅ PASS — không đọc được ví người khác';
+  else raise warning 'TEST5 ❌ FAIL — đọc được % voucher của user B', v_others; end if;
+end $$;
+rollback;
+
+
+-- ============================================================================
+-- TEST 6 — TỒN KHO QUÀ không âm: admin_grant_gift khi stock=1 chạy 2 lần
+--   Kỳ vọng: lần 1 OK (stock→0), lần 2 RAISE 'hết kho'. Giả lập đăng nhập ADMIN.
+-- ============================================================================
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',
+       json_build_object('sub','<<ADMIN_UUID>>','email','minhquyet08122003@gmail.com','role','authenticated')::text, true);
+do $$
+declare v_gift uuid := '<<GIFT_ID>>'; v_user uuid := '<<USER_UUID>>'; v_stock int;
+begin
+  update public.gifts set stock = 1 where id = v_gift;          -- ép kho = 1 để test (sẽ rollback)
+  perform public.admin_grant_gift(v_user, v_gift, 'TEST6 lần 1');
+  select stock into v_stock from public.gifts where id = v_gift;
+  if v_stock = 0 then raise notice 'TEST6a ✅ PASS — phát 1 lần, kho về 0';
+  else raise warning 'TEST6a ❌ FAIL — kho = % (kỳ vọng 0)', v_stock; end if;
+
+  begin
+    perform public.admin_grant_gift(v_user, v_gift, 'TEST6 lần 2');
+    raise warning 'TEST6b ❌ FAIL — phát được khi hết kho (kho âm!)';
+  exception when others then
+    raise notice 'TEST6b ✅ PASS — bị chặn khi hết kho: %', sqlerrm;
+  end;
+end $$;
+rollback;
+
+
+-- ============================================================================
+-- TEST 7 — compute_tier đúng ngưỡng (CĐ-7: Bạc 1tr / Vàng 5tr / KC 10tr) — money-only
+--   Chạy READ-ONLY (không ghi). Đổi số v_spend để thử từng mốc.
+-- ============================================================================
+do $$
+declare
+  v_member text; v_silver text; v_gold text; v_diamond text;
+begin
+  -- Lưu ý: compute_tier đọc profiles, nên test này minh hoạ bằng truy vấn ngưỡng trực tiếp.
+  select code into v_member  from public.membership_tiers where is_active and 999999    >= min_spend and (min_kg=0 or 0>=min_kg) order by sort_order desc limit 1;
+  select code into v_silver  from public.membership_tiers where is_active and 1000000   >= min_spend and (min_kg=0 or 0>=min_kg) order by sort_order desc limit 1;
+  select code into v_gold    from public.membership_tiers where is_active and 5000000   >= min_spend and (min_kg=0 or 0>=min_kg) order by sort_order desc limit 1;
+  select code into v_diamond from public.membership_tiers where is_active and 10000000  >= min_spend and (min_kg=0 or 0>=min_kg) order by sort_order desc limit 1;
+  raise notice 'TEST7 — 999.999đ→%, 1.000.000đ→%, 5.000.000đ→%, 10.000.000đ→%', v_member, v_silver, v_gold, v_diamond;
+  raise notice 'TEST7 kỳ vọng: member / silver / gold / diamond (nếu seed mặc định 03 mục 7)';
+end $$;
+
+
+-- ============================================================================
+-- TEST 8 — place_order: ÉP trần tổng giảm 30% (CĐ-5)
+--   Tạo voucher fixed lớn (vd 90% đơn) rồi đặt → giảm thực tế phải ≤ 30% tạm tính.
+--   Giả lập đăng nhập user; bọc ROLLBACK.
+-- ============================================================================
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims',
+       json_build_object('sub','<<USER_UUID>>','email','<<EMAIL>>','role','authenticated')::text, true);
+do $$
+declare
+  v_items jsonb := jsonb_build_array(jsonb_build_object('product_id','<<PRODUCT_ID>>','quantity',2));
+  v_voucher uuid := '<<CUSTOMER_VOUCHER_FIXED_LON_ID>>'; -- fixed value rất lớn để chạm trần
+  v_oid uuid; v_total bigint; v_disc bigint; v_subtotal bigint;
+begin
+  select round(coalesce(sum(p.price * x.quantity),0))::bigint into v_subtotal
+  from jsonb_to_recordset(v_items) as x(product_id uuid, quantity numeric)
+  join public.products p on p.id = x.product_id;
+
+  v_oid := public.place_order(v_items, 'cod', 'TEST8 trần 30%', v_voucher);
+  select total_amount into v_total from public.orders where id = v_oid;
+  select discount_applied into v_disc from public.customer_vouchers where id = v_voucher;
+
+  raise notice 'TEST8 — tạm tính=%, giảm voucher=%, thành tiền=%, trần 30%%=%',
+    v_subtotal, v_disc, v_total, floor(v_subtotal*0.30);
+  if v_disc <= floor(v_subtotal*0.30) then raise notice 'TEST8 ✅ PASS — giảm không vượt trần 30%%';
+  else raise warning 'TEST8 ❌ FAIL — giảm % vượt trần %', v_disc, floor(v_subtotal*0.30); end if;
+end $$;
+rollback;
+
+-- ================================ HẾT B11 ================================
+-- Ghi kết quả PASS/FAIL của từng test vào README mục 6 khi chạy xong.

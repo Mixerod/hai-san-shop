@@ -183,6 +183,8 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
   const [tiers, setTiers] = useState<MembershipTier[]>([])
   const [vouchers, setVouchers] = useState<CustomerVoucher[]>([])
   const [gifts, setGifts] = useState<CustomerGift[]>([])
+  // B13 — tăng để tải lại thẻ sau khi gộp đơn vãng lai (tích lũy/hạng thay đổi).
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -253,7 +255,7 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
     return () => {
       alive = false
     }
-  }, [userId])
+  }, [userId, refreshTick])
 
   if (loading) {
     return (
@@ -390,6 +392,9 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
       {/* ─── KHỐI D — Quà đã nhận ─────────────────────────────────────────────────── */}
       <GiftsReceived gifts={gifts} />
 
+      {/* ─── KHỐI E — Gộp đơn vãng lai cũ (B13) ───────────────────────────────────── */}
+      <MergeGuestOrders userId={userId} onMerged={() => setRefreshTick((t) => t + 1)} />
+
       {/* Gợi ý mua sắm */}
       <div className="text-center">
         <Link
@@ -400,6 +405,160 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
           Tiếp tục mua sắm
         </Link>
       </div>
+    </div>
+  )
+}
+
+// ─── KHỐI E — Gộp đơn vãng lai cũ (B13) ─────────────────────────────────────────────
+// Khách từng đặt đơn KHÔNG đăng nhập (guest) có thể gộp vào tài khoản để được tính tích lũy.
+// Khớp theo Tên + SĐT (parse phía server từ orders.note). Khách XÁC NHẬN trước khi gộp để
+// giảm rủi ro khớp sai (07 mục 6). Mọi GHI qua RPC SECURITY DEFINER merge_guest_orders.
+function MergeGuestOrders({ userId, onMerged }: { userId: string; onMerged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [prefilled, setPrefilled] = useState(false)
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  // Prefill Tên/SĐT từ profile của chính mình (owner-read) khi mở form.
+  useEffect(() => {
+    if (!open || prefilled) return
+    let alive = true
+    supabase
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive) return
+        if (data?.full_name) setName(String(data.full_name))
+        if (data?.phone) setPhone(String(data.phone))
+        setPrefilled(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [open, prefilled, userId])
+
+  const phoneDigits = phone.replace(/\D/g, '')
+  const canMerge = name.trim().length > 0 && phoneDigits.length >= 9 && !busy
+
+  async function handleMerge() {
+    setBusy(true)
+    setResult(null)
+    try {
+      const { data, error } = await supabase.rpc('merge_guest_orders', { p_name: name, p_phone: phone })
+      if (error) throw error
+      const count = Number(data ?? 0)
+      if (count > 0) {
+        setResult({ ok: true, msg: `Đã gộp ${count} đơn cũ vào tài khoản. Tích lũy & hạng đã được cập nhật.` })
+        onMerged()
+      } else {
+        setResult({
+          ok: false,
+          msg: 'Không tìm thấy đơn vãng lai nào khớp Tên + SĐT. Hãy kiểm tra lại đúng tên & số điện thoại đã dùng khi đặt.',
+        })
+      }
+    } catch (err) {
+      console.error('merge_guest_orders error:', err)
+      setResult({ ok: false, msg: 'Có lỗi khi gộp đơn. Vui lòng thử lại sau.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+        <PackageCheck className="w-3.5 h-3.5" />
+        Gộp đơn mua trước đây
+      </p>
+      <p className="text-sm text-slate-500 font-medium mb-4 leading-relaxed">
+        Từng đặt hàng khi <span className="font-bold text-slate-600">chưa đăng nhập</span>? Gộp các đơn đó
+        vào tài khoản để được tính vào tích lũy & lên hạng. Cần đúng <span className="font-bold">Tên</span> và{' '}
+        <span className="font-bold">Số điện thoại</span> đã dùng khi đặt.
+      </p>
+
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
+        >
+          <PackageCheck className="w-4 h-4" />
+          Gộp đơn cũ của tôi
+        </button>
+      ) : (
+        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600">Họ tên (khi đặt đơn)</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Vd: Lê Minh Quyết"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600">Số điện thoại (khi đặt đơn)</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="09xx xxx xxx"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+              />
+            </div>
+          </div>
+
+          {result && (
+            <div
+              className={`flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm ${
+                result.ok
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-amber-50 border border-amber-200 text-amber-700'
+              }`}
+            >
+              {result.ok ? (
+                <CheckCircle2 className="w-4.5 h-4.5 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4.5 h-4.5 shrink-0 mt-0.5" />
+              )}
+              <p className="font-medium leading-relaxed">{result.msg}</p>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              disabled={!canMerge}
+              onClick={handleMerge}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4" />}
+              {busy ? 'Đang gộp...' : 'Xác nhận gộp đơn'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                setResult(null)
+              }}
+              className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors px-3 py-2.5"
+            >
+              Đóng
+            </button>
+          </div>
+          {!canMerge && !busy && (
+            <p className="text-[11px] text-slate-400 font-medium">
+              Cần nhập Tên và Số điện thoại hợp lệ (tối thiểu 9 chữ số) để gộp.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
