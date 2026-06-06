@@ -1,0 +1,165 @@
+# 🦐 TÍNH NĂNG HẠNG THÀNH VIÊN / HỘI VIÊN MUA SẮM — TRUNG TÂM ĐIỀU PHỐI
+
+> **File này là "bộ não" của cả tính năng.** Bất kỳ agent nào (kể cả Claude trong phiên mới) khi
+> bắt đầu làm việc về tính năng hạng thành viên **PHẢI đọc file này TRƯỚC TIÊN**, sau đó mới mở các
+> file chi tiết tương ứng. Đây cũng là nơi **ghi nhận tiến độ** — làm xong tới đâu, cập nhật tới đó.
+
+- **Dự án:** `Mixerod/hai-san-shop` (Next.js + React + Supabase/Postgres, admin web tại `/admin`)
+- **Thư mục tài liệu:** `docs/membership/`
+- **Người yêu cầu:** Quyết (minhquyet08122003@gmail.com)
+- **Ngày khởi tạo:** 2026-06-05
+- **Trạng thái tổng thể:** 🟢 SPEC ĐÃ CHỐT (A9 ✅, 2026-06-06) — sẵn sàng Giai đoạn B (code)
+
+---
+
+## 1. Tính năng này là gì? (đọc 30 giây)
+
+Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → Kim Cương) cho khách đã đăng nhập:
+
+1. Khách **tự động được thăng hạng** khi tổng chi tiêu (hoặc tổng số kg đã mua) đạt mốc.
+2. Mỗi hạng có **quyền lợi** riêng (giảm giá, free ship, voucher định kỳ, quà...). Quyền lợi này
+   **admin cấu hình được** từ giao diện web, không hard-code.
+3. Khi một đơn đạt mốc (vd ≥ 5kg hoặc ≥ X đồng) khách có thể **nhận voucher/quà**. Mốc & quà cũng
+   **admin tùy chỉnh được**.
+4. Admin có thể **trao hạng / trao voucher / trao quà thủ công** (chủ động), song song với cơ chế tự động.
+
+> ⚠️ Tính năng này **chỉ áp dụng cho khách đã đăng nhập** (có `profiles.id`). Đơn của khách vãng lai
+> (`orders.user_id = null`) không tích lũy hạng.
+
+---
+
+## 2. Bản đồ tài liệu — agent nào làm việc gì thì đọc file nào
+
+| # | File | Nội dung | Đọc khi bạn cần... |
+|---|------|----------|---------------------|
+| 00 | `README.md` (file này) | Điều phối, tiến độ, quy ước làm việc | LUÔN đọc đầu tiên |
+| 01 | `01-tong-quan.md` | Tầm nhìn, phạm vi, thuật ngữ, sơ đồ luồng | Hiểu bức tranh tổng thể |
+| 02 | `02-chinh-sach-hang-thanh-vien.md` | Định nghĩa hạng, mốc, quyền lợi, luật voucher/quà + **các quyết định cần chốt** | Code chính sách / cấu hình hạng |
+| 03 | `03-thiet-ke-database.md` | Bảng mới, cột, quan hệ, **toàn bộ lệnh SQL migration** | Tạo/sửa schema, viết migration |
+| 04 | `04-logic-nghiep-vu.md` | Tích lũy, tự thăng hạng, trao thủ công, phát voucher/quà, **idempotency** | Code trigger / function / API logic |
+| 05 | `05-giao-dien-admin.md` | Đặc tả màn admin (cấu hình hạng, voucher, quà, trao thủ công) | Code UI admin |
+| 06 | `06-giao-dien-khach-hang.md` | Đặc tả màn khách (huy hiệu hạng, thanh tiến độ, ví voucher, áp voucher) | Code UI khách |
+| 07 | `07-rui-ro-va-edge-cases.md` | Lỗi trùng lặp, lag, đệ quy, race condition, bảo mật RLS | Trước khi viết trigger/SQL bất kỳ |
+| 08 | `08-ke-hoach-trien-khai.md` | Chia phase công việc + checklist (nguồn sự thật cho việc CODE) | Bắt đầu code / chọn việc tiếp theo |
+
+> **Quy tắc vàng:** Không sửa code production khi mục 02–04 còn dòng `❓ CẦN CHỐT`. Hỏi Quyết trước.
+
+---
+
+## 3. BẢNG TIẾN ĐỘ (Single Source of Truth) — cập nhật mỗi khi xong một mốc
+
+> Quy ước trạng thái: `⬜ chưa làm` · `🟡 đang làm` · `✅ xong` · `⛔ bị chặn (ghi lý do)`
+
+### Giai đoạn A — Đặc tả (làm trước, KHÔNG code)
+
+| Mã | Việc | Trạng thái | File | Ghi chú |
+|----|------|-----------|------|---------|
+| A1 | Tổng quan & thuật ngữ | ✅ | 01 | |
+| A2 | Chính sách hạng & quyền lợi (bản nháp + open decisions) | ✅ | 02 | Chờ Quyết chốt mục "CẦN CHỐT" |
+| A3 | Thiết kế database + SQL | ✅ | 03 | Bản nháp, review trước khi chạy |
+| A4 | Logic nghiệp vụ + idempotency | ✅ | 04 | |
+| A5 | Đặc tả UI admin | ✅ | 05 | |
+| A6 | Đặc tả UI khách | ✅ | 06 | |
+| A7 | Rủi ro & edge cases | ✅ | 07 | |
+| A8 | Kế hoạch chia phase code | ✅ | 08 | Khung sẵn, chi tiết hóa sau khi A2 được chốt |
+| **A9** | **Quyết review & chốt "CẦN CHỐT" trong 02** | ✅ | 02 | Quyết đã chốt 2026-06-06 (xem 02 mục 6) |
+
+### Giai đoạn B — Triển khai code (CHỈ bắt đầu sau khi A9 ✅)
+
+| Mã | Việc | Trạng thái | File hướng dẫn | Ghi chú |
+|----|------|-----------|----------------|---------|
+| B1 | Migration: bảng config (tiers, vouchers, gifts, reward_rules) | 🟡 | `LENH-SQL-...txt` PHẦN 1,8 | SQL soạn xong — **chờ Quyết chạy trên Supabase** |
+| B2 | Migration: bảng dữ liệu khách (cột profiles, customer_vouchers, customer_gifts, events) | 🟡 | `LENH-SQL-...txt` PHẦN 2,3,4 | SQL soạn xong — chờ chạy |
+| B3 | Migration: function + trigger tích lũy & thăng hạng (idempotent) | 🟡 | `LENH-SQL-...txt` PHẦN 5,6 | SQL soạn xong — chờ chạy + test idempotency |
+| B4 | Migration: RLS policies cho mọi bảng mới | 🟡 | `LENH-SQL-...txt` PHẦN 7 | SQL soạn xong — chờ chạy |
+| B5 | UI admin: cấu hình hạng & quyền lợi | ⬜ | 05 | |
+| B6 | UI admin: cấu hình voucher / quà / mốc thưởng | ⬜ | 05 | |
+| B7 | UI admin: trao hạng/voucher/quà thủ công + audit log | ⬜ | 05 | |
+| B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ⬜ | 06 | |
+| B9 | UI khách: ví voucher + áp voucher tại /checkout | ⬜ | 06 | |
+| B10 | Tích hợp giảm giá hạng vào tính tiền đơn | ⬜ | 04, 06 | Cẩn thận giá tại checkout |
+| B11 | Test: idempotency, race, duplicate voucher | ⬜ | 07 | |
+| B12 | Soát bảo mật RLS + code review | ⬜ | 07 | |
+| B13 | Backfill khách cũ + RPC `merge_guest_orders` (gộp đơn vãng lai khi đăng ký, khớp Tên+SĐT) | ⬜ | 04 (mục 8, 9), 07 | Chạy 1 lần go-live + tích hợp vào `auth/page.tsx` |
+
+> 📌 **Mỗi agent khi hoàn thành một mã việc:** đổi trạng thái ô tương ứng thành ✅, ghi 1 dòng ngày +
+> tóm tắt vào `## 6. NHẬT KÝ` phía dưới, rồi commit. Đừng để bảng này lệch với thực tế.
+
+---
+
+## 4. ⚙️ Hướng dẫn tự bật "Auto Accept" (để agent chạy liên tục, ít bị hỏi quyền)
+
+Mục tiêu: khi đang chạy chuỗi việc dài (vd cả Giai đoạn B), agent không phải dừng hỏi quyền mỗi lần
+sửa file. **Cách an toàn (khuyến nghị):** dùng allow-list trong `.claude/settings.json` thay vì tắt
+toàn bộ kiểm soát.
+
+**Cách 1 — Phím tắt (thủ công, nhanh nhất):** Bấm `Shift + Tab` trong Claude Code để xoay vòng
+permission mode → chọn **"accept edits"** (tự duyệt Edit/Write). Bấm lại để tắt.
+
+**Cách 2 — Cấu hình bền vững (khuyến nghị cho chạy tự động):** tạo/sửa `.claude/settings.json` ở gốc
+repo. Có thể nhờ skill `update-config` làm hộ ("dùng /update-config để bật acceptEdits + allow các
+lệnh supabase/npm"). Mẫu:
+
+```jsonc
+// .claude/settings.json  (gốc repo hai-san-shop)
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",          // tự duyệt Edit/Write trên file trong repo
+    "allow": [
+      "Read", "Edit", "Write", "Grep", "Glob",
+      "Bash(npm run *)", "Bash(npx tsc *)", "Bash(git status)", "Bash(git diff *)"
+    ]
+  }
+}
+```
+
+> 🔒 **Nguyên tắc:** KHÔNG dùng cờ `--dangerously-skip-permissions`. Không auto-accept các lệnh phá
+> hủy (drop table, rm -rf, push --force). Migration SQL chạy trên Supabase **luôn để con người bấm
+> chạy** (xem mục lưu ý ở `03`).
+
+---
+
+## 5. ⏭️ Hướng dẫn "Schedule / tự nhảy sang việc tiếp theo"
+
+Mục tiêu: làm xong một mã việc trong bảng tiến độ thì **tự động chuyển sang việc kế tiếp** mà không
+cần người gõ lại lệnh.
+
+**Cơ chế khuyến nghị — dùng skill `/loop` (self-paced):**
+
+1. Mở `08-ke-hoach-trien-khai.md` để biết thứ tự việc (B1 → B2 → ...).
+2. Chạy lệnh dạng:
+   ```
+   /loop Đọc docs/membership/README.md mục 3 (Bảng tiến độ). Tìm mã việc B đầu tiên đang ⬜,
+   đọc file hướng dẫn của nó, thực hiện trọn vẹn, cập nhật trạng thái thành ✅ + ghi nhật ký mục 6,
+   rồi commit. Nếu mọi việc B đã ✅ thì dừng và báo cáo.
+   ```
+3. `/loop` sẽ tự lặp: mỗi vòng làm 1 mã việc rồi tự gọi lại chính nó cho mã kế tiếp, đến khi hết.
+
+**Khi cần chạy theo lịch thật (cron) thay vì lặp liên tục:** dùng skill `/schedule` để tạo routine
+chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp muốn "mỗi sáng tiếp tục một phase".
+
+> ✋ Điều kiện an toàn để được tự nhảy việc: (a) Giai đoạn A9 đã ✅; (b) việc đang làm không yêu cầu
+> quyết định nghiệp vụ mới; (c) build/test xanh trước khi đánh ✅. Nếu vướng một trong ba, **dừng và
+> hỏi**, đừng nhảy tiếp.
+
+---
+
+## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
+
+- **2026-06-06** — **B1–B4 (SQL) soạn xong**: gộp toàn bộ tầng DB vào `LENH-SQL-CAN-CHAY-TREN-SUPABASE.txt`
+  (bảng + index + function + trigger + RLS + seed + backfill + merge). Chờ Quyết chạy trên Supabase SQL
+  Editor. Tiếp theo: UI B5→B13 sẽ chạy ở session mới qua /schedule. _(by Claude)_
+- **2026-06-06** — **A9 ✅**: Quyết chốt 10 quyết định → cập nhật `02/03/04` (ngưỡng 1tr/5tr/10tr,
+  money-only + lifetime, free ship khu vực Thủ Đức, merge đơn vãng lai, fix bug min_kg=0 trong
+  compute_tier). Sẵn sàng **Giai đoạn B** — bắt đầu B1 (migration config). _(by Claude)_
+- **2026-06-05** — Khởi tạo thư mục `docs/membership/` + viết toàn bộ đặc tả Giai đoạn A (01–08).
+  Trạng thái: chờ Quyết review & chốt các mục "CẦN CHỐT" trong `02` (mã A9). _(by Claude)_
+
+---
+
+## 7. Cách RESUME khi bạn là agent mới vào (cold start)
+
+1. Đọc xong file này (đặc biệt mục 3 — Bảng tiến độ và mục 6 — Nhật ký).
+2. Tìm mã việc 🟡 đang dở; nếu không có, lấy mã ⬜ đầu tiên đúng thứ tự.
+3. Mở đúng file hướng dẫn ghi ở cột "File".
+4. Làm → cập nhật trạng thái → ghi nhật ký → commit. Không nhảy cóc thứ tự khi có phụ thuộc.
