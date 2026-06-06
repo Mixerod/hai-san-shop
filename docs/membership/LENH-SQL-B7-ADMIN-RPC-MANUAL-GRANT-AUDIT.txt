@@ -1,0 +1,425 @@
+================================================================================
+  B7 — RPC ADMIN: TRAO THỦ CÔNG (HẠNG / VOUCHER / QUÀ) + ĐIỀU CHỈNH + AUDIT LOG
+       (profiles, customer_vouchers, customer_gifts, membership_events)
+  Chạy file này trong Supabase SQL Editor (giống B1–B6).
+  An toàn chạy lại nhiều lần (create or replace).
+================================================================================
+--  BỐI CẢNH KIẾN TRÚC (vì sao cần các RPC này) — GIỐNG B5/B6:
+--    • RLS bảng ví khách & audit (PHẦN 7 của file gốc B1–B4) chỉ cho service_role GHI,
+--      và khách chỉ ĐỌC dữ liệu CỦA MÌNH. App chỉ có anon browser client
+--      (src/lib/supabase.ts) → KHÔNG ghi thẳng, cũng KHÔNG đọc được khách khác.
+--    • Giải pháp: RPC SECURITY DEFINER tự kiểm "caller là admin" rồi đọc/ghi giúp.
+--      → 1 network hop trực tiếp tới Supabase (không thêm server route), RLS vẫn khóa.
+--  ADMIN = đúng email cấu hình ở src/proxy.ts (đã gate /admin). Không thêm bảng admin.
+--  Hàm public.is_membership_admin() đã tạo ở B5 — KHÔNG tạo lại ở đây.
+--  Hàm public.compute_tier(uuid) đã tạo ở B3 (04 mục 5) — dùng để áp lại hạng 1 khách.
+--------------------------------------------------------------------------------
+--  QUY TẮC GHI (07 mục 5):
+--    • MỌI thao tác ghi dữ liệu khách đi qua RPC admin_grant_* / admin_set_* dưới đây.
+--    • MỖI thao tác ghi đúng 1 dòng membership_events với actor = email admin (auth.email()).
+--    • Trao quà trừ kho AN TOÀN (chỉ trừ khi còn kho; bỏ qua khi stock=-1 vô hạn).
+--    • Thu hồi voucher chỉ khi status='active' (cập nhật có điều kiện chống double).
+--    • Đặt hạng thủ công -> tier_locked=true để auto KHÔNG ghi đè (04 mục d).
+--------------------------------------------------------------------------------
+
+-- ============================================================================
+--  PHẦN A — ĐỌC: DANH SÁCH KHÁCH + VÍ + AUDIT (chỉ admin)            [05 mục 6]
+-- ============================================================================
+
+-- A1) Danh sách khách (phân trang + tìm kiếm theo tên/sđt/email).
+--     total_count = tổng số khách khớp bộ lọc (cho phân trang ở client).
+--     Kèm tên + màu hạng (join membership_tiers theo code) để render badge.
+create or replace function public.admin_list_customers(
+  p_search text,
+  p_limit  int,
+  p_offset int
+) returns table (
+  id              uuid,
+  full_name       text,
+  phone           text,
+  email           text,
+  tier_code       text,
+  tier_name       text,
+  tier_color      text,
+  lifetime_spend  bigint,
+  lifetime_kg     numeric,
+  tier_locked     boolean,
+  tier_updated_at timestamptz,
+  total_count     bigint
+)
+language plpgsql stable security definer set search_path = public as $$
+declare v_search text;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  v_search := nullif(btrim(coalesce(p_search, '')), '');
+  return query
+    select p.id, p.full_name, p.phone, p.email,
+           p.tier_code, t.name, t.color,
+           p.lifetime_spend, p.lifetime_kg, p.tier_locked, p.tier_updated_at,
+           count(*) over() as total_count
+    from public.profiles p
+    left join public.membership_tiers t on t.code = p.tier_code
+    where v_search is null
+       or p.full_name ilike '%' || v_search || '%'
+       or p.phone     ilike '%' || v_search || '%'
+       or p.email     ilike '%' || v_search || '%'
+    order by p.lifetime_spend desc nulls last, p.full_name asc nulls last
+    limit  coalesce(nullif(p_limit, 0), 20)
+    offset coalesce(p_offset, 0);
+end;
+$$;
+
+-- A2) Audit timeline của 1 khách (membership_events, mới nhất trước).
+create or replace function public.admin_customer_events(
+  p_user  uuid,
+  p_limit int,
+  p_offset int
+) returns table (
+  id           uuid,
+  event_type   text,
+  from_tier    text,
+  to_tier      text,
+  amount       numeric,
+  reason       text,
+  actor        text,
+  ref_order_id uuid,
+  metadata     jsonb,
+  created_at   timestamptz
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query
+    select e.id, e.event_type, e.from_tier, e.to_tier, e.amount, e.reason,
+           e.actor, e.ref_order_id, e.metadata, e.created_at
+    from public.membership_events e
+    where e.user_id = p_user
+    order by e.created_at desc
+    limit  coalesce(nullif(p_limit, 0), 50)
+    offset coalesce(p_offset, 0);
+end;
+$$;
+
+-- A3) Ví voucher của 1 khách (kèm tên/loại/giá trị từ định nghĩa) — để xem & thu hồi.
+create or replace function public.admin_customer_vouchers(p_user uuid)
+returns table (
+  id             uuid,
+  voucher_def_id uuid,
+  voucher_name   text,
+  type           text,
+  value          numeric,
+  source         text,
+  status         text,
+  issued_at      timestamptz,
+  expires_at     timestamptz,
+  used_at        timestamptz
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query
+    select cv.id, cv.voucher_def_id, v.name, v.type, v.value, cv.source,
+           cv.status, cv.issued_at, cv.expires_at, cv.used_at
+    from public.customer_vouchers cv
+    join public.voucher_definitions v on v.id = cv.voucher_def_id
+    where cv.user_id = p_user
+    order by cv.issued_at desc;
+end;
+$$;
+
+-- A4) Quà đã phát cho 1 khách (kèm tên quà).
+create or replace function public.admin_customer_gifts(p_user uuid)
+returns table (
+  id         uuid,
+  gift_id    uuid,
+  gift_name  text,
+  source     text,
+  status     text,
+  granted_at timestamptz
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query
+    select cg.id, cg.gift_id, g.name, cg.source, cg.status, cg.granted_at
+    from public.customer_gifts cg
+    join public.gifts g on g.id = cg.gift_id
+    where cg.user_id = p_user
+    order by cg.granted_at desc;
+end;
+$$;
+
+-- ============================================================================
+--  PHẦN B — GHI: TRAO / ĐẶT HẠNG / ĐIỀU CHỈNH (mỗi thao tác ghi 1 event)
+-- ============================================================================
+
+-- B1) Đặt hạng THỦ CÔNG. Khóa hạng (tier_locked=true) để auto KHÔNG ghi đè (04 mục d).
+--     Yêu cầu code hạng tồn tại trong membership_tiers. Ghi event 'tier_set_manual'.
+create or replace function public.admin_set_customer_tier(
+  p_user      uuid,
+  p_tier_code text,
+  p_reason    text
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_old text; v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  if p_tier_code is null or btrim(p_tier_code) = '' then
+    raise exception 'Phải chọn hạng';
+  end if;
+  if not exists (select 1 from public.membership_tiers where code = p_tier_code) then
+    raise exception 'Hạng không tồn tại';
+  end if;
+
+  select tier_code into v_old from public.profiles where id = p_user for update;
+  if not found then raise exception 'Không tìm thấy khách'; end if;
+
+  update public.profiles
+     set tier_code = p_tier_code, tier_locked = true, tier_updated_at = now()
+   where id = p_user;
+
+  insert into public.membership_events(user_id, event_type, from_tier, to_tier, reason, actor)
+  values (p_user, 'tier_set_manual', v_old, p_tier_code, nullif(btrim(coalesce(p_reason,'')), ''), v_actor);
+end;
+$$;
+
+-- B2) MỞ KHÓA hạng -> trả về tự động: tier_locked=false rồi áp lại compute_tier.
+--     Ghi event 'tier_unlocked' (+ 'tier_recompute' nếu hạng đổi).
+create or replace function public.admin_unlock_customer_tier(p_user uuid)
+returns text
+language plpgsql security definer set search_path = public as $$
+declare v_old text; v_new text; v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+
+  select tier_code into v_old from public.profiles where id = p_user for update;
+  if not found then raise exception 'Không tìm thấy khách'; end if;
+
+  update public.profiles set tier_locked = false where id = p_user;
+  insert into public.membership_events(user_id, event_type, actor)
+  values (p_user, 'tier_unlocked', v_actor);
+
+  v_new := public.compute_tier(p_user);
+  if v_new is not null and v_new is distinct from v_old then
+    update public.profiles set tier_code = v_new, tier_updated_at = now() where id = p_user;
+    insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor)
+    values (p_user, 'tier_recompute', v_old, v_new, v_actor);
+    return v_new;
+  end if;
+  return v_old;
+end;
+$$;
+
+-- B3) Áp dụng lại hạng cho 1 KHÁCH (nút "Áp lại hạng" — 05 mục 6).
+--     Bỏ qua nếu khách đang bị khóa hạng (phải mở khóa trước). Trả về hạng sau khi tính.
+create or replace function public.admin_recompute_customer_tier(p_user uuid)
+returns text
+language plpgsql security definer set search_path = public as $$
+declare v_old text; v_locked boolean; v_new text; v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+
+  select tier_code, tier_locked into v_old, v_locked
+  from public.profiles where id = p_user for update;
+  if not found then raise exception 'Không tìm thấy khách'; end if;
+  if v_locked then
+    raise exception 'Khách đang bị khóa hạng — hãy mở khóa trước khi áp lại';
+  end if;
+
+  v_new := public.compute_tier(p_user);
+  if v_new is not null and v_new is distinct from v_old then
+    update public.profiles set tier_code = v_new, tier_updated_at = now() where id = p_user;
+    insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor)
+    values (p_user, 'tier_recompute', v_old, v_new, v_actor);
+  end if;
+  return coalesce(v_new, v_old);
+end;
+$$;
+
+-- B4) TRAO VOUCHER thủ công (source='manual'). expires_at null -> lấy valid_to của định nghĩa.
+--     Ghi event 'voucher_issued'. Trả về bản ghi customer_vouchers vừa tạo.
+create or replace function public.admin_grant_voucher(
+  p_user           uuid,
+  p_voucher_def_id uuid,
+  p_expires_at     timestamptz,
+  p_reason         text
+) returns public.customer_vouchers
+language plpgsql security definer set search_path = public as $$
+declare v_row public.customer_vouchers; v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  if not exists (select 1 from public.profiles where id = p_user) then
+    raise exception 'Không tìm thấy khách';
+  end if;
+  if not exists (select 1 from public.voucher_definitions where id = p_voucher_def_id) then
+    raise exception 'Voucher không tồn tại';
+  end if;
+
+  insert into public.customer_vouchers(user_id, voucher_def_id, source, status, expires_at)
+  values (
+    p_user, p_voucher_def_id, 'manual', 'active',
+    coalesce(p_expires_at, (select valid_to from public.voucher_definitions where id = p_voucher_def_id))
+  )
+  returning * into v_row;
+
+  insert into public.membership_events(user_id, event_type, reason, actor, metadata)
+  values (
+    p_user, 'voucher_issued', nullif(btrim(coalesce(p_reason,'')), ''), v_actor,
+    jsonb_build_object('voucher_def_id', p_voucher_def_id, 'customer_voucher_id', v_row.id)
+  );
+  return v_row;
+end;
+$$;
+
+-- B5) THU HỒI voucher (chỉ khi đang 'active' — cập nhật có điều kiện chống double).
+--     Ghi event 'voucher_revoked'.
+create or replace function public.admin_revoke_voucher(
+  p_voucher_id uuid,
+  p_reason     text
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_user uuid; v_def uuid; v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+
+  update public.customer_vouchers
+     set status = 'revoked'
+   where id = p_voucher_id and status = 'active'
+   returning user_id, voucher_def_id into v_user, v_def;
+
+  if not found then
+    raise exception 'Voucher không tồn tại hoặc không còn ở trạng thái active';
+  end if;
+
+  insert into public.membership_events(user_id, event_type, reason, actor, metadata)
+  values (
+    v_user, 'voucher_revoked', nullif(btrim(coalesce(p_reason,'')), ''), v_actor,
+    jsonb_build_object('voucher_def_id', v_def, 'customer_voucher_id', p_voucher_id)
+  );
+end;
+$$;
+
+-- B6) TRAO QUÀ thủ công + TRỪ KHO an toàn (07 mục 4). Bỏ qua trừ khi stock=-1 (vô hạn).
+--     Chỉ phát nếu còn kho; nếu hết -> báo lỗi (không tạo bản ghi). Ghi event 'gift_granted'.
+create or replace function public.admin_grant_gift(
+  p_user    uuid,
+  p_gift_id uuid,
+  p_reason  text
+) returns public.customer_gifts
+language plpgsql security definer set search_path = public as $$
+declare v_row public.customer_gifts; v_stock int; v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  if not exists (select 1 from public.profiles where id = p_user) then
+    raise exception 'Không tìm thấy khách';
+  end if;
+
+  -- Trừ kho có điều kiện: chỉ giảm khi stock>0; stock=-1 (vô hạn) giữ nguyên.
+  update public.gifts
+     set stock = case when stock = -1 then -1 else stock - 1 end
+   where id = p_gift_id and (stock > 0 or stock = -1)
+   returning stock into v_stock;
+
+  if not found then
+    raise exception 'Quà không tồn tại hoặc đã hết kho';
+  end if;
+
+  insert into public.customer_gifts(user_id, gift_id, source, status)
+  values (p_user, p_gift_id, 'manual', 'granted')
+  returning * into v_row;
+
+  insert into public.membership_events(user_id, event_type, reason, actor, metadata)
+  values (
+    p_user, 'gift_granted', nullif(btrim(coalesce(p_reason,'')), ''), v_actor,
+    jsonb_build_object('gift_id', p_gift_id, 'customer_gift_id', v_row.id, 'stock_after', v_stock)
+  );
+  return v_row;
+end;
+$$;
+
+-- B7) ĐIỀU CHỈNH TÍCH LŨY (hiếm dùng — 05 mục 6: BẮT BUỘC nhập lý do).
+--     Set lifetime_spend/kg TUYỆT ĐỐI. Nếu khách không khóa hạng -> áp lại hạng luôn.
+--     Ghi event 'accrual_adjust' (+ 'tier_recompute' nếu hạng đổi).
+create or replace function public.admin_adjust_accumulation(
+  p_user      uuid,
+  p_new_spend bigint,
+  p_new_kg    numeric,
+  p_reason    text
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_old text; v_locked boolean; v_new text; v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  if p_reason is null or btrim(p_reason) = '' then
+    raise exception 'Điều chỉnh tích lũy bắt buộc nhập lý do';
+  end if;
+  if coalesce(p_new_spend, 0) < 0 or coalesce(p_new_kg, 0) < 0 then
+    raise exception 'Tích lũy phải >= 0';
+  end if;
+
+  select tier_code, tier_locked into v_old, v_locked
+  from public.profiles where id = p_user for update;
+  if not found then raise exception 'Không tìm thấy khách'; end if;
+
+  update public.profiles
+     set lifetime_spend = coalesce(p_new_spend, 0),
+         lifetime_kg    = coalesce(p_new_kg, 0)
+   where id = p_user;
+
+  insert into public.membership_events(user_id, event_type, amount, reason, actor, metadata)
+  values (
+    p_user, 'accrual_adjust', coalesce(p_new_spend, 0), btrim(p_reason), v_actor,
+    jsonb_build_object('lifetime_kg', coalesce(p_new_kg, 0))
+  );
+
+  -- Áp lại hạng nếu không bị khóa thủ công.
+  if not v_locked then
+    v_new := public.compute_tier(p_user);
+    if v_new is not null and v_new is distinct from v_old then
+      update public.profiles set tier_code = v_new, tier_updated_at = now() where id = p_user;
+      insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor)
+      values (p_user, 'tier_recompute', v_old, v_new, v_actor);
+    end if;
+  end if;
+end;
+$$;
+
+-- ============================================================================
+--  PHẦN C — QUYỀN GỌI (các RPC tự kiểm admin bên trong → chỉ cấp authenticated)
+-- ============================================================================
+grant execute on function public.admin_list_customers(text,int,int)                  to authenticated;
+grant execute on function public.admin_customer_events(uuid,int,int)                  to authenticated;
+grant execute on function public.admin_customer_vouchers(uuid)                        to authenticated;
+grant execute on function public.admin_customer_gifts(uuid)                           to authenticated;
+
+grant execute on function public.admin_set_customer_tier(uuid,text,text)              to authenticated;
+grant execute on function public.admin_unlock_customer_tier(uuid)                     to authenticated;
+grant execute on function public.admin_recompute_customer_tier(uuid)                  to authenticated;
+grant execute on function public.admin_grant_voucher(uuid,uuid,timestamptz,text)      to authenticated;
+grant execute on function public.admin_revoke_voucher(uuid,text)                      to authenticated;
+grant execute on function public.admin_grant_gift(uuid,uuid,text)                     to authenticated;
+grant execute on function public.admin_adjust_accumulation(uuid,bigint,numeric,text)  to authenticated;
+
+-- DONE. B7 hoàn tất tầng RPC. Bước tiếp theo: B8 (UI khách ở /profile).

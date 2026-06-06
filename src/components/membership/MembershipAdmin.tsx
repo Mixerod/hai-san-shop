@@ -1,8 +1,8 @@
 "use client";
 
 // Khu vực "Thành viên & Ưu đãi" trong /admin (05 mục 1) — thanh tab con điều phối.
-// Tab "Hạng thành viên" = B5; "Voucher / Quà tặng / Mốc thưởng" = B6.
-// Tab "Khách hàng" (trao thủ công + audit) thuộc B7 — sẽ bật sau.
+// Tab "Hạng thành viên" = B5; "Voucher / Quà tặng / Mốc thưởng" = B6;
+// "Khách hàng" (trao thủ công + audit) = B7.
 
 import { useState } from "react";
 import { Crown, Ticket, Gift, Target, Users } from "lucide-react";
@@ -10,6 +10,7 @@ import MembershipTiersAdmin from "@/components/MembershipTiersAdmin";
 import MembershipVouchersAdmin from "./MembershipVouchersAdmin";
 import MembershipGiftsAdmin from "./MembershipGiftsAdmin";
 import MembershipRewardRulesAdmin from "./MembershipRewardRulesAdmin";
+import MembershipCustomersAdmin from "./MembershipCustomersAdmin";
 
 type SubTab = "tiers" | "vouchers" | "gifts" | "rules" | "customers";
 
@@ -18,7 +19,7 @@ const TABS: { id: SubTab; label: string; icon: typeof Crown; disabled?: boolean 
   { id: "vouchers", label: "Voucher", icon: Ticket },
   { id: "gifts", label: "Quà tặng", icon: Gift },
   { id: "rules", label: "Mốc thưởng", icon: Target },
-  { id: "customers", label: "Khách hàng", icon: Users, disabled: true },
+  { id: "customers", label: "Khách hàng", icon: Users },
 ];
 
 export default function MembershipAdmin() {
@@ -67,6 +68,7 @@ export default function MembershipAdmin() {
         {tab === "vouchers" && <MembershipVouchersAdmin />}
         {tab === "gifts" && <MembershipGiftsAdmin />}
         {tab === "rules" && <MembershipRewardRulesAdmin />}
+        {tab === "customers" && <MembershipCustomersAdmin />}
       </div>
     </div>
   );
