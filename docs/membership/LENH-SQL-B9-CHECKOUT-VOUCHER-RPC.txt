@@ -1,0 +1,176 @@
+================================================================================
+  B9 — RPC ĐẶT ĐƠN CÓ VOUCHER: place_order
+       (xác thực phía tin cậy + đánh dấu voucher used ATOMIC chống double-spend)
+  Chạy file này trong Supabase SQL Editor (giống B1–B7).
+  An toàn chạy lại nhiều lần (create or replace).
+================================================================================
+--  BỐI CẢNH KIẾN TRÚC (vì sao cần RPC này) — GIỐNG B5/B6/B7:
+--    • App chỉ có anon/authenticated browser client (src/lib/supabase.ts). RLS:
+--      customer_vouchers chỉ chủ ĐỌC, chỉ service_role GHI (03/07). Khách KHÔNG được
+--      tự đánh dấu voucher 'used' từ client → phải qua SECURITY DEFINER.
+--    • Tính tiền giảm là VÙNG NHẠY CẢM (04 mục 7): KHÔNG tin số client gửi lên.
+--      Server PHẢI đọc lại GIÁ THẬT trong products + điều kiện voucher rồi tự tính.
+--    • Đánh dấu voucher 'used' phải ATOMIC (update ... where status='active',
+--      rowCount=1) để 1 voucher KHÔNG dùng được cho 2 đơn song song (double-spend).
+--------------------------------------------------------------------------------
+--  PHẠM VI B9:
+--    • CHỈ xử lý đơn của KHÁCH ĐĂNG NHẬP có chọn voucher. Đơn guest / đơn không
+--      voucher vẫn đi luồng insert cũ ở client (KHÔNG đổi).
+--    • Giảm giá theo HẠNG là B10 — ở đây CHỪA SEAM (v_tier_discount = 0), chưa làm.
+--    • Voucher loại 'free_ship' KHÔNG trừ tiền hàng ở B9 (ưu đãi vận chuyển) → giảm 0.
+--    • Trần TỔNG giảm = 30% tạm tính (CĐ-5): áp giảm hạng trước (0) rồi voucher.
+--------------------------------------------------------------------------------
+--  YÊU CẦU: các bảng B1–B4 đã có (orders, order_items, products, customer_vouchers,
+--    voucher_definitions, profiles, membership_events). KHÔNG tạo lại bảng ở đây.
+--------------------------------------------------------------------------------
+
+create or replace function public.place_order(
+  p_items          jsonb,   -- [{ "product_id": uuid, "quantity": number }, ...]
+  p_payment_method text,    -- 'cod' | 'transfer'
+  p_note           text,
+  p_voucher_id     uuid     -- customer_vouchers.id cần áp (BẮT BUỘC ở luồng này)
+) returns uuid              -- trả về orders.id vừa tạo
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user          uuid := auth.uid();
+  v_subtotal      bigint := 0;
+  v_item_count    int := 0;
+  v_req_count     int;
+  v_tier          text;
+  v_tier_discount bigint := 0;   -- SEAM B10: giảm theo hạng (CHƯA làm) = 0
+  v_cap           bigint;
+  v_vc            record;        -- customer_voucher + định nghĩa
+  v_raw_disc      bigint := 0;
+  v_voucher_disc  bigint := 0;
+  v_final         bigint;
+  v_order_id      uuid;
+  v_updated       int;
+begin
+  -- (0) Xác thực người gọi + tham số cơ bản
+  if v_user is null then
+    raise exception 'Phải đăng nhập để đặt đơn có voucher';
+  end if;
+  if p_payment_method is null or p_payment_method not in ('cod', 'transfer') then
+    raise exception 'Phương thức thanh toán không hợp lệ';
+  end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'Giỏ hàng trống';
+  end if;
+  if p_voucher_id is null then
+    raise exception 'Thiếu voucher (luồng này chỉ dùng khi có áp voucher)';
+  end if;
+  v_req_count := jsonb_array_length(p_items);
+
+  -- (1) TẠM TÍNH từ GIÁ THẬT trong DB (KHÔNG tin client). quantity numeric (kg có .5).
+  --     Đối chiếu số dòng khớp để chặn product_id rác.
+  select round(coalesce(sum(p.price * x.quantity), 0))::bigint, count(*)
+    into v_subtotal, v_item_count
+  from jsonb_to_recordset(p_items) as x(product_id uuid, quantity numeric)
+  join public.products p on p.id = x.product_id
+  where x.quantity > 0;
+
+  if v_item_count <> v_req_count then
+    raise exception 'Một số sản phẩm không tồn tại hoặc số lượng không hợp lệ';
+  end if;
+  if v_subtotal <= 0 then
+    raise exception 'Giá trị đơn không hợp lệ';
+  end if;
+
+  -- (2) ĐỌC + KHÓA HÀNG voucher của chính user (for update) → xác thực điều kiện.
+  select cv.id, cv.status, cv.expires_at,
+         vd.type, vd.value, vd.max_discount, vd.min_order, vd.tier_scope
+    into v_vc
+  from public.customer_vouchers cv
+  join public.voucher_definitions vd on vd.id = cv.voucher_def_id
+  where cv.id = p_voucher_id and cv.user_id = v_user
+  for update of cv;
+
+  if not found then
+    raise exception 'Voucher không thuộc về bạn';
+  end if;
+  if v_vc.status <> 'active' then
+    raise exception 'Voucher không còn khả dụng';
+  end if;
+  if v_vc.expires_at is not null and v_vc.expires_at < now() then
+    raise exception 'Voucher đã hết hạn';
+  end if;
+  if v_subtotal < coalesce(v_vc.min_order, 0) then
+    raise exception 'Đơn chưa đạt giá trị tối thiểu để dùng voucher';
+  end if;
+  -- tier_scope: null = mọi hạng; else phải chứa hạng hiện tại của khách
+  if v_vc.tier_scope is not null then
+    select tier_code into v_tier from public.profiles where id = v_user;
+    if v_tier is null or not (v_tier = any(v_vc.tier_scope)) then
+      raise exception 'Voucher không áp dụng cho hạng của bạn';
+    end if;
+  end if;
+
+  -- (3) Tính tiền giảm THÔ theo loại voucher (free_ship = 0 ở B9).
+  if v_vc.type = 'percent' then
+    v_raw_disc := floor(v_subtotal * v_vc.value / 100.0)::bigint;
+    if v_vc.max_discount is not null then
+      v_raw_disc := least(v_raw_disc, v_vc.max_discount);
+    end if;
+  elsif v_vc.type = 'fixed' then
+    v_raw_disc := least(floor(v_vc.value)::bigint, v_subtotal);
+  else
+    v_raw_disc := 0;  -- free_ship: ưu đãi vận chuyển, không trừ tiền hàng
+  end if;
+
+  -- (4) CĐ-5: áp giảm HẠNG trước (B10 = 0) rồi voucher; trần TỔNG giảm = 30% tạm tính.
+  v_cap := floor(v_subtotal * 0.30)::bigint;
+  v_voucher_disc := greatest(0, least(v_raw_disc, v_cap - v_tier_discount));
+  v_final := greatest(0, v_subtotal - v_tier_discount - v_voucher_disc);
+
+  -- (5) Tạo đơn + dòng đơn (price_at_time = GIÁ THẬT từ DB).
+  insert into public.orders(user_id, status, payment_method, total_amount, note)
+  values (v_user, 'pending', p_payment_method, v_final, p_note)
+  returning id into v_order_id;
+
+  insert into public.order_items(order_id, product_id, quantity, price_at_time)
+  select v_order_id, p.id, x.quantity, p.price
+  from jsonb_to_recordset(p_items) as x(product_id uuid, quantity numeric)
+  join public.products p on p.id = x.product_id
+  where x.quantity > 0;
+
+  -- (6) ĐÁNH DẤU voucher 'used' ATOMIC (chống double-spend). Hàng đã khóa ở (2),
+  --     thêm điều kiện status='active' + kiểm rowCount=1 cho chắc.
+  update public.customer_vouchers
+     set status = 'used',
+         used_at = now(),
+         used_order_id = v_order_id,
+         discount_applied = v_voucher_disc
+   where id = p_voucher_id and user_id = v_user and status = 'active';
+  get diagnostics v_updated = row_count;
+  if v_updated <> 1 then
+    -- Voucher vừa bị dùng ở nơi khác → rollback toàn bộ transaction (kể cả order ở trên).
+    raise exception 'Voucher vừa được sử dụng, vui lòng thử lại';
+  end if;
+
+  -- (7) Ghi audit: 1 event voucher_used (actor=system, khách tự đặt).
+  insert into public.membership_events(user_id, event_type, amount, actor, ref_order_id, metadata)
+  values (
+    v_user, 'voucher_used', v_voucher_disc, 'system', v_order_id,
+    jsonb_build_object(
+      'customer_voucher_id', p_voucher_id,
+      'subtotal', v_subtotal,
+      'final', v_final
+    )
+  );
+
+  return v_order_id;
+end;
+$$;
+
+-- ============================================================================
+--  QUYỀN GỌI: RPC tự xác thực auth.uid() bên trong → chỉ cấp cho authenticated.
+-- ============================================================================
+grant execute on function public.place_order(jsonb, text, text, uuid) to authenticated;
+
+-- DONE. B9 hoàn tất tầng RPC đặt đơn có voucher.
+--   • Client (src/app/checkout/page.tsx): khách đăng nhập + chọn voucher → gọi rpc('place_order').
+--   • Đơn guest / không voucher vẫn đi luồng insert cũ (không đổi).
+--   • Bước tiếp theo: B10 (tích hợp giảm giá HẠNG vào tính tiền — thay v_tier_discount).

@@ -1,10 +1,13 @@
 'use client'
 
-// ─── B8 — UI KHÁCH: huy hiệu hạng + thanh tiến độ (tab "Thành viên" ở /profile) ──────
+// ─── B8/B9 — UI KHÁCH: huy hiệu hạng + tiến độ + ví voucher + quà (tab "Thành viên" /profile) ──
 // Màn KHÁCH (đã đăng nhập). CHỈ ĐỌC qua RLS:
 //   • profiles của chính mình (owner-read) — tier_code + tích lũy
 //   • membership_tiers công khai (is_active=true) — để hiển thị quyền lợi + ngưỡng hạng kế
-// KHÔNG ghi hạng/tích lũy từ client, KHÔNG gọi RPC admin_*. Xếp hạng theo TIỀN lifetime (02 mục 6).
+//   • customer_vouchers của chính mình (owner-read) + join voucher_definitions (đọc công khai) — KHỐI C
+//   • customer_gifts của chính mình (owner-read) + join gifts (đọc công khai) — KHỐI D
+// KHÔNG ghi hạng/tích lũy/voucher từ client, KHÔNG gọi RPC admin_*. Xếp hạng theo TIỀN lifetime (02 mục 6).
+// Việc ÁP voucher (đánh dấu used) thực hiện ở /checkout qua RPC SECURITY DEFINER (B9) — KHÔNG ghi ở đây.
 // Theme SÁNG khớp /profile (khác với ui.tsx admin theme tối).
 
 import { useEffect, useState } from 'react'
@@ -19,6 +22,13 @@ import {
   Sparkles,
   TrendingUp,
   ShoppingBag,
+  Ticket,
+  Gift,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ChevronDown,
+  PackageCheck,
 } from 'lucide-react'
 
 // ─── Types khớp schema 03 ───────────────────────────────────────────────────────────
@@ -42,6 +52,42 @@ type MembershipProfile = {
   tier_updated_at: string | null
 }
 
+// ─── Types ví voucher / quà (KHỐI C, D) — khớp schema 03 mục 4 ──────────────────────
+type VoucherType = 'percent' | 'fixed' | 'free_ship'
+type VoucherStatus = 'active' | 'used' | 'expired' | 'revoked'
+
+type VoucherDefinition = {
+  name: string
+  type: VoucherType
+  value: number
+  min_order: number
+  max_discount: number | null
+}
+
+type CustomerVoucher = {
+  id: string
+  status: VoucherStatus
+  issued_at: string
+  expires_at: string | null
+  used_at: string | null
+  discount_applied: number | null
+  voucher_definitions: VoucherDefinition | null
+}
+
+type GiftStatus = 'granted' | 'delivered' | 'cancelled'
+
+type GiftDefinition = {
+  name: string
+  image_url: string | null
+}
+
+type CustomerGift = {
+  id: string
+  status: GiftStatus
+  granted_at: string
+  gifts: GiftDefinition | null
+}
+
 const DEFAULT_TIER_COLOR = '#94a3b8' // slate-400, fallback khi tier.color null
 
 function formatVND(n: number): string {
@@ -52,10 +98,82 @@ function formatKg(n: number): string {
   return (n ?? 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' kg'
 }
 
+function formatDate(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+// Mô tả giá trị voucher để khách đọc nhanh.
+function describeVoucher(def: VoucherDefinition | null): string {
+  if (!def) return 'Ưu đãi'
+  if (def.type === 'percent') {
+    const cap = def.max_discount ? ` (tối đa ${formatVND(def.max_discount)})` : ''
+    return `Giảm ${def.value}%${cap}`
+  }
+  if (def.type === 'fixed') return `Giảm ${formatVND(def.value)}`
+  return 'Miễn phí vận chuyển'
+}
+
+// Voucher còn dùng được không (active + chưa hết hạn). Hết hạn nhưng vẫn status='active'
+// (cron expire chưa chạy) thì coi như hết hạn ở phía hiển thị.
+function isVoucherExpired(v: CustomerVoucher): boolean {
+  if (!v.expires_at) return false
+  const exp = new Date(v.expires_at).getTime()
+  return !Number.isNaN(exp) && exp < Date.now()
+}
+
 // perks lưu jsonb — supabase trả về mảng JS; vẫn guard cho dữ liệu lệch.
 function normalizePerks(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.filter((p): p is string => typeof p === 'string')
   return []
+}
+
+// Quan hệ join (to-one) đôi khi được supabase-js trả về dạng mảng 1 phần tử — lấy phần tử đầu.
+function pickOne<T>(rel: unknown): T | null {
+  if (Array.isArray(rel)) return (rel[0] as T) ?? null
+  if (rel && typeof rel === 'object') return rel as T
+  return null
+}
+
+function normalizeVouchers(raw: unknown): CustomerVoucher[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((row): CustomerVoucher => {
+    const r = row as Record<string, unknown>
+    const def = pickOne<Record<string, unknown>>(r.voucher_definitions)
+    return {
+      id: String(r.id),
+      status: (r.status as VoucherStatus) ?? 'active',
+      issued_at: String(r.issued_at ?? ''),
+      expires_at: (r.expires_at as string | null) ?? null,
+      used_at: (r.used_at as string | null) ?? null,
+      discount_applied: r.discount_applied != null ? Number(r.discount_applied) : null,
+      voucher_definitions: def
+        ? {
+            name: String(def.name ?? 'Ưu đãi'),
+            type: (def.type as VoucherType) ?? 'fixed',
+            value: Number(def.value ?? 0),
+            min_order: Number(def.min_order ?? 0),
+            max_discount: def.max_discount != null ? Number(def.max_discount) : null,
+          }
+        : null,
+    }
+  })
+}
+
+function normalizeGifts(raw: unknown): CustomerGift[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((row): CustomerGift => {
+    const r = row as Record<string, unknown>
+    const g = pickOne<Record<string, unknown>>(r.gifts)
+    return {
+      id: String(r.id),
+      status: (r.status as GiftStatus) ?? 'granted',
+      granted_at: String(r.granted_at ?? ''),
+      gifts: g ? { name: String(g.name ?? 'Quà tặng'), image_url: (g.image_url as string | null) ?? null } : null,
+    }
+  })
 }
 
 export default function CustomerMembershipCard({ userId }: { userId: string }) {
@@ -63,6 +181,8 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
   const [error, setError] = useState(false)
   const [profile, setProfile] = useState<MembershipProfile | null>(null)
   const [tiers, setTiers] = useState<MembershipTier[]>([])
+  const [vouchers, setVouchers] = useState<CustomerVoucher[]>([])
+  const [gifts, setGifts] = useState<CustomerGift[]>([])
 
   useEffect(() => {
     let alive = true
@@ -70,7 +190,7 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
       setLoading(true)
       setError(false)
       try {
-        const [profileRes, tiersRes] = await Promise.all([
+        const [profileRes, tiersRes, vouchersRes, giftsRes] = await Promise.all([
           supabase
             .from('profiles')
             .select('tier_code, lifetime_spend, lifetime_kg, tier_updated_at')
@@ -80,12 +200,25 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
             .from('membership_tiers')
             .select('code, name, sort_order, color, min_spend, min_kg, discount_percent, free_ship, perks, is_active')
             .order('sort_order', { ascending: true }),
+          supabase
+            .from('customer_vouchers')
+            .select('id, status, issued_at, expires_at, used_at, discount_applied, voucher_definitions(name, type, value, min_order, max_discount)')
+            .eq('user_id', userId)
+            .order('issued_at', { ascending: false }),
+          supabase
+            .from('customer_gifts')
+            .select('id, status, granted_at, gifts(name, image_url)')
+            .eq('user_id', userId)
+            .order('granted_at', { ascending: false }),
         ])
 
         if (!alive) return
 
         if (profileRes.error) throw profileRes.error
         if (tiersRes.error) throw tiersRes.error
+        // Ví/quà lỗi nhẹ thì để rỗng — không làm vỡ thẻ hạng (Khối A/B vẫn hiện).
+        if (vouchersRes.error) console.error('Error loading vouchers:', vouchersRes.error)
+        if (giftsRes.error) console.error('Error loading gifts:', giftsRes.error)
 
         const prof = profileRes.data
         setProfile(
@@ -107,6 +240,8 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
             perks: normalizePerks(t.perks),
           })) as MembershipTier[]
         )
+        setVouchers(normalizeVouchers(vouchersRes.data))
+        setGifts(normalizeGifts(giftsRes.data))
       } catch (err) {
         console.error('Error loading membership:', err)
         if (alive) setError(true)
@@ -249,6 +384,12 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
         hasCurrentTier={!!currentTier}
       />
 
+      {/* ─── KHỐI C — Ví voucher ──────────────────────────────────────────────────── */}
+      <VoucherWallet vouchers={vouchers} />
+
+      {/* ─── KHỐI D — Quà đã nhận ─────────────────────────────────────────────────── */}
+      <GiftsReceived gifts={gifts} />
+
       {/* Gợi ý mua sắm */}
       <div className="text-center">
         <Link
@@ -336,6 +477,182 @@ function ProgressToNextTier({
           <span className="font-bold text-emerald-600">Bạn đã đủ điều kiện lên {nextTier.name}! 🎉</span>
         )}
       </p>
+    </div>
+  )
+}
+
+// ─── KHỐI C — Ví voucher (active nổi bật + lịch sử thu gọn) ─────────────────────────
+function VoucherWallet({ vouchers }: { vouchers: CustomerVoucher[] }) {
+  const [showHistory, setShowHistory] = useState(false)
+
+  // active + chưa hết hạn = dùng được; còn lại (used/expired/revoked/active-quá-hạn) -> lịch sử.
+  const usable = vouchers.filter((v) => v.status === 'active' && !isVoucherExpired(v))
+  const history = vouchers.filter((v) => !(v.status === 'active' && !isVoucherExpired(v)))
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
+        <Ticket className="w-3.5 h-3.5" />
+        Ví voucher của bạn
+      </p>
+
+      {usable.length === 0 ? (
+        <div className="text-center py-6">
+          <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-slate-100">
+            <Ticket className="w-7 h-7 text-slate-300" />
+          </div>
+          <p className="text-sm font-bold text-slate-500">Chưa có voucher khả dụng</p>
+          <p className="text-xs text-slate-400 font-medium mt-1">
+            Mua sắm đạt mốc thưởng để nhận voucher ưu đãi nhé!
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {usable.map((v) => (
+            <VoucherTicket key={v.id} voucher={v} />
+          ))}
+          <Link
+            href="/checkout"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors mt-1"
+          >
+            Dùng ngay khi thanh toán
+            <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+          </Link>
+        </div>
+      )}
+
+      {/* Lịch sử voucher (đã dùng / hết hạn / thu hồi) */}
+      {history.length > 0 && (
+        <div className="mt-5 pt-5 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setShowHistory((s) => !s)}
+            className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showHistory ? 'rotate-180' : ''}`} />
+            Lịch sử voucher ({history.length})
+          </button>
+          {showHistory && (
+            <div className="space-y-2 mt-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              {history.map((v) => (
+                <VoucherTicket key={v.id} voucher={v} muted />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── 1 thẻ voucher ──────────────────────────────────────────────────────────────────
+function VoucherTicket({ voucher, muted = false }: { voucher: CustomerVoucher; muted?: boolean }) {
+  const def = voucher.voucher_definitions
+  const expired = isVoucherExpired(voucher)
+  const statusLabel =
+    voucher.status === 'used'
+      ? 'Đã dùng'
+      : voucher.status === 'revoked'
+        ? 'Đã thu hồi'
+        : voucher.status === 'expired' || expired
+          ? 'Hết hạn'
+          : 'Khả dụng'
+
+  return (
+    <div
+      className={`relative flex items-stretch gap-3 rounded-2xl border p-4 transition-all ${
+        muted
+          ? 'border-slate-100 bg-slate-50/60 opacity-75'
+          : 'border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50/50 hover:shadow-md'
+      }`}
+    >
+      <div
+        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+          muted ? 'bg-slate-200/70 text-slate-400' : 'bg-orange-500 text-white shadow-sm'
+        }`}
+      >
+        <Ticket className="w-5 h-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={`font-bold text-sm truncate ${muted ? 'text-slate-500' : 'text-slate-800'}`}>
+          {def?.name ?? 'Ưu đãi'}
+        </p>
+        <p className={`text-xs font-semibold mt-0.5 ${muted ? 'text-slate-400' : 'text-orange-600'}`}>
+          {describeVoucher(def)}
+        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] font-medium text-slate-400">
+          {def && def.min_order > 0 && <span>Đơn tối thiểu {formatVND(def.min_order)}</span>}
+          {voucher.expires_at && (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              HSD {formatDate(voucher.expires_at)}
+            </span>
+          )}
+        </div>
+      </div>
+      <span
+        className={`absolute top-3 right-3 text-[10px] font-black px-2 py-0.5 rounded-full ${
+          statusLabel === 'Khả dụng'
+            ? 'bg-emerald-100 text-emerald-700'
+            : 'bg-slate-200 text-slate-500'
+        }`}
+      >
+        {statusLabel}
+      </span>
+    </div>
+  )
+}
+
+// ─── KHỐI D — Quà đã nhận ────────────────────────────────────────────────────────────
+function GiftsReceived({ gifts }: { gifts: CustomerGift[] }) {
+  // Quà đã hủy không hiển thị nổi bật (giữ gọn). Chỉ hiện granted/delivered.
+  const visible = gifts.filter((g) => g.status !== 'cancelled')
+  if (visible.length === 0) return null
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
+        <Gift className="w-3.5 h-3.5" />
+        Quà đã nhận
+      </p>
+      <div className="space-y-3">
+        {visible.map((g) => {
+          const delivered = g.status === 'delivered'
+          return (
+            <div
+              key={g.id}
+              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3"
+            >
+              {g.gifts?.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={g.gifts.image_url}
+                  alt={g.gifts?.name ?? 'Quà tặng'}
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-100 shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-pink-100 flex items-center justify-center shrink-0">
+                  <Gift className="w-6 h-6 text-pink-500" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-sm text-slate-800 truncate">{g.gifts?.name ?? 'Quà tặng'}</p>
+                <p className="text-[11px] font-medium text-slate-400 mt-0.5">
+                  Nhận ngày {formatDate(g.granted_at)}
+                </p>
+              </div>
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full shrink-0 ${
+                  delivered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                }`}
+              >
+                {delivered ? <PackageCheck className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                {delivered ? 'Đã giao' : 'Đã nhận'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -76,7 +76,7 @@ Thêm hệ thống **hạng thành viên** (vd: Đồng → Bạc → Vàng → 
 | B6 | UI admin: cấu hình voucher / quà / mốc thưởng | ✅ | 05 | Tab con Voucher/Quà/Mốc thưởng trong "Thành viên & Ưu đãi". **CẦN chạy `LENH-SQL-B6-ADMIN-RPC-VOUCHER-GIFT-RULES.txt` trên Supabase** (RPC ghi config) |
 | B7 | UI admin: trao hạng/voucher/quà thủ công + audit log | ✅ | 05 | Tab "Khách hàng" trong "Thành viên & Ưu đãi". **CẦN chạy `LENH-SQL-B7-ADMIN-RPC-MANUAL-GRANT-AUDIT.txt` trên Supabase** (RPC trao/đặt hạng/điều chỉnh + đọc khách/ví/audit) |
 | B8 | UI khách: huy hiệu hạng + thanh tiến độ ở /profile | ✅ | 06 | Tab "Thành viên" ở /profile. **KHÔNG cần chạy SQL** — đọc trực tiếp qua RLS (profiles owner-read + membership_tiers công khai) |
-| B9 | UI khách: ví voucher + áp voucher tại /checkout | ⬜ | 06 | |
+| B9 | UI khách: ví voucher + áp voucher tại /checkout | ✅ | 06 | Khối C/D ở /profile + chọn/áp voucher ở /checkout. **CẦN chạy `LENH-SQL-B9-CHECKOUT-VOUCHER-RPC.txt` trên Supabase** (RPC `place_order` đặt đơn có voucher) |
 | B10 | Tích hợp giảm giá hạng vào tính tiền đơn | ⬜ | 04, 06 | Cẩn thận giá tại checkout |
 | B11 | Test: idempotency, race, duplicate voucher | ⬜ | 07 | |
 | B12 | Soát bảo mật RLS + code review | ⬜ | 07 | |
@@ -146,6 +146,21 @@ chạy định kỳ với cùng prompt như trên. Dùng cho trường hợp mu�
 
 ## 6. NHẬT KÝ (mỗi dòng = 1 mốc hoàn thành, mới nhất ở trên)
 
+- **2026-06-06** — **B9 ✅**: UI khách ví voucher + áp voucher khi thanh toán. **(1)** `/profile`
+  (`CustomerMembershipCard.tsx`): thêm **Khối C** (ví voucher — khả dụng nổi bật + lịch sử thu gọn,
+  đọc `customer_vouchers` owner-read join `voucher_definitions`) + **Khối D** (quà đã nhận, đọc
+  `customer_gifts` join `gifts`). **(2)** `/checkout` (`src/app/checkout/page.tsx`): khối **"Voucher của
+  bạn"** CHỈ hiện khi đăng nhập — liệt kê voucher đủ điều kiện (active, chưa hết hạn, loại percent/fixed,
+  `min_order ≤ tạm tính`, `tier_scope` hợp lệ); chọn 1 → tổng kết **Tạm tính → Giảm voucher → Thành
+  tiền** với **trần tổng giảm 30%** (CĐ-5). Khi submit **CÓ voucher** → gọi **RPC SECURITY DEFINER
+  `place_order`**: server đọc lại GIÁ THẬT trong DB, xác thực voucher (sở hữu/active/hạn/min_order/
+  tier_scope), tính giảm có trần, tạo order + order_items, **đánh dấu voucher used ATOMIC**
+  (`where status='active'` + rowCount=1, chống double-spend — 04 mục 7), ghi 1 event `voucher_used`.
+  **KHÔNG phá luồng guest / đơn không voucher** (vẫn insert client như cũ). Voucher `free_ship` không
+  trừ tiền hàng ở B9 (ưu đãi vận chuyển) → lọc khỏi danh sách chọn. Giảm giá HẠNG là **B10** — chỉ
+  chừa seam (`v_tier_discount = 0`). **➡️ CẦN Quyết chạy
+  `docs/membership/LENH-SQL-B9-CHECKOUT-VOUCHER-RPC.txt` trên Supabase** (cấp execute cho `authenticated`)
+  thì đường áp voucher mới hoạt động. Build ✅ (TypeScript pass). _(by Claude — phiên local)_
 - **2026-06-06** — **B8 ✅**: Thêm tab **"Thành viên"** vào `/profile`
   (`src/app/profile/page.tsx`: mở rộng `activeTab` thêm `'membership'`, đọc `?tab=membership`, nút tab
   thứ 3 icon Crown). Tách UI vào component KHÁCH mới `src/components/membership/CustomerMembershipCard.tsx`
