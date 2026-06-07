@@ -1,0 +1,184 @@
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
+  useWindowDimensions,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ScrollView,
+} from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { useResponsive } from '@/hooks/useResponsive';
+
+const ADMIN_EMAIL = 'minhquyet08122003@gmail.com';
+
+export default function LoginScreen() {
+  const { width } = useWindowDimensions();
+  const cardMaxWidth = Math.min(420, width - 32); // never overflow on any screen
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { fs } = useResponsive();
+
+  async function handleLogin() {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      if (error) {
+        Alert.alert('Đăng nhập thất bại', error.message);
+        return;
+      }
+
+      if (data.user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        await supabase.auth.signOut();
+        Alert.alert('Không có quyền', 'Tài khoản này không có quyền admin.');
+        return;
+      }
+      // Auth store sẽ được cập nhật tự động qua onAuthStateChange trong _layout.tsx
+      // và router sẽ tự redirect sang /(tabs)/orders
+    } catch (err) {
+      Alert.alert('Lỗi', 'Có lỗi xảy ra, vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.card, { maxWidth: cardMaxWidth }]}>
+            <Text style={[styles.logo, { fontSize: fs(48) }]}>🐟</Text>
+            <Text style={[styles.title, { fontSize: fs(24) }]}>Hải Sản Shop</Text>
+            <Text style={[styles.subtitle, { fontSize: fs(14) }]}>Admin Dashboard</Text>
+
+            <View style={styles.form}>
+              <Text style={[styles.label, { fontSize: fs(13) }]}>Email</Text>
+              <TextInput
+                style={[styles.input, { fontSize: fs(15) }]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="admin@example.com"
+                placeholderTextColor="#4b5563"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+              />
+
+              <Text style={[styles.label, { fontSize: fs(13) }]}>Mật khẩu</Text>
+              <TextInput
+                style={[styles.input, { fontSize: fs(15) }]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
+                placeholderTextColor="#4b5563"
+                secureTextEntry
+                autoComplete="password"
+              />
+
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={[styles.buttonText, { fontSize: fs(16) }]}>Đăng nhập</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  keyboardAvoid: {
+    flex: 1,
+    backgroundColor: '#030712',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  card: {
+    width: '100%',
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    padding: 32,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    alignItems: 'center',
+  },
+  logo: {
+    marginBottom: 8,
+  },
+  title: {
+    color: '#f9fafb',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: '#6b7280',
+    marginBottom: 32,
+  },
+  form: {
+    width: '100%',
+  },
+  label: {
+    color: '#9ca3af',
+    marginBottom: 6,
+    marginTop: 16,
+  },
+  input: {
+    backgroundColor: '#1f2937',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#374151',
+    color: '#f9fafb',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  button: {
+    backgroundColor: '#0ea5e9',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 28,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+});
+

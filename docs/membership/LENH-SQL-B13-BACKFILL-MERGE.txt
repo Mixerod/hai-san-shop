@@ -1,0 +1,118 @@
+================================================================================
+  B13 — BACKFILL khách cũ + RPC merge_guest_orders (gộp đơn vãng lai)
+        Chạy trong Supabase SQL Editor. (04 mục 8 = backfill; 04 mục 9 = merge.)
+================================================================================
+--  YÊU CẦU: đã chạy B1–B4 (bảng + cột profiles + compute_tier + calc_order_kg + trigger).
+--  GỒM 2 PHẦN ĐỘC LẬP:
+--    • PHẦN A — BACKFILL: chạy 1 LẦN khi go-live, TRƯỚC khi mở tích lũy realtime.
+--      Tính lại lifetime_spend/kg từ đơn 'done' cũ + set hạng, và đánh dấu đơn cũ
+--      rewards_processed_at=now() để KHÔNG phát thưởng hồi tố. Chạy lại an toàn (set tuyệt đối).
+--    • PHẦN B — RPC merge_guest_orders: tạo hàm cho khách tự gộp đơn vãng lai (khớp
+--      Tên+SĐT parse từ orders.note). Client gọi ở /profile (nút "Gộp đơn cũ của tôi").
+--------------------------------------------------------------------------------
+
+
+-- ============================================================================
+--  PHẦN A — BACKFILL (CHẠY 1 LẦN, off-peak). Bọc transaction để an toàn.
+-- ============================================================================
+begin;
+
+-- A1) Tính lại tích lũy từ TOÀN BỘ đơn 'done' đã có rồi set hạng (set TUYỆT ĐỐI).
+with agg as (
+  select user_id,
+         sum(total_amount)::bigint              as spend,
+         sum(public.calc_order_kg(id))          as kg
+  from public.orders
+  where status = 'done' and user_id is not null
+  group by user_id
+)
+update public.profiles p
+   set lifetime_spend = a.spend,
+       lifetime_kg    = a.kg,
+       tier_code      = case when p.tier_locked then p.tier_code else public.compute_tier(p.id) end,
+       tier_updated_at= now()
+from agg a
+where a.user_id = p.id;
+
+-- A2) Đánh dấu đơn 'done' cũ là ĐÃ xử lý thưởng để trigger KHÔNG phát voucher/quà hồi tố.
+update public.orders
+   set rewards_processed_at = now()
+ where status = 'done' and rewards_processed_at is null;
+
+-- ⚠️ Kiểm tra kết quả TRƯỚC khi commit:
+--   select id, tier_code, lifetime_spend, lifetime_kg from public.profiles order by lifetime_spend desc limit 20;
+-- Nếu đúng → COMMIT; nếu sai → ROLLBACK.
+commit;
+-- rollback;  -- (mở dòng này thay cho commit nếu muốn huỷ)
+
+
+-- ============================================================================
+--  PHẦN B — RPC merge_guest_orders (khách tự gộp đơn vãng lai khớp Tên+SĐT)
+--           An toàn chạy lại (create or replace). 04 mục 9 + rủi ro 07 mục 6.
+-- ============================================================================
+create or replace function public.merge_guest_orders(p_name text, p_phone text)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user  uuid := auth.uid();
+  v_phone text;
+  v_name  text;
+  v_count int;
+begin
+  if v_user is null then
+    raise exception 'Phải đăng nhập để gộp đơn';
+  end if;
+
+  -- Chuẩn hóa: SĐT bỏ ký tự không phải số; Tên lower+trim.
+  v_phone := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+  v_name  := lower(btrim(coalesce(p_name, '')));
+
+  -- CHẶN KHỚP LỎNG: SĐT < 9 số hoặc tên rỗng → không gộp (tránh gộp nhầm đơn người khác).
+  if length(v_phone) < 9 or v_name = '' then
+    return 0;
+  end if;
+
+  -- Gán user_id cho các đơn vãng lai có note chứa CẢ Tên (đã chuẩn hóa) VÀ SĐT (đã chuẩn hóa).
+  -- KHÔNG phát thưởng hồi tố: giữ/đặt rewards_processed_at.
+  with cand as (
+    select id from public.orders
+    where user_id is null
+      and regexp_replace(coalesce(note, ''), '\D', '', 'g') like '%' || v_phone || '%'
+      and position(v_name in lower(coalesce(note, ''))) > 0
+  )
+  update public.orders o
+     set user_id = v_user,
+         rewards_processed_at = coalesce(o.rewards_processed_at, now())
+  from cand
+  where o.id = cand.id;
+  get diagnostics v_count = row_count;
+
+  -- Set lại tích lũy theo TỔNG TUYỆT ĐỐI (idempotent) rồi tính lại hạng (nếu không khóa).
+  update public.profiles p set
+    lifetime_spend = (select coalesce(sum(total_amount), 0)::bigint
+                      from public.orders where user_id = v_user and status = 'done'),
+    lifetime_kg    = (select coalesce(sum(public.calc_order_kg(id)), 0)
+                      from public.orders where user_id = v_user and status = 'done')
+  where p.id = v_user;
+
+  update public.profiles
+     set tier_code = public.compute_tier(v_user), tier_updated_at = now()
+   where id = v_user and not tier_locked;
+
+  -- Audit để truy vết & hoàn tác nếu khớp sai.
+  insert into public.membership_events(user_id, event_type, amount, actor, metadata)
+  values (v_user, 'merge_guest_orders', v_count, 'system',
+          jsonb_build_object('name', v_name, 'phone', v_phone));
+
+  return v_count;
+end;
+$$;
+
+-- RPC tự kiểm auth.uid() bên trong → chỉ cấp cho authenticated.
+grant execute on function public.merge_guest_orders(text, text) to authenticated;
+
+-- DONE B13. Client (/profile) gọi rpc('merge_guest_orders', { p_name, p_phone }) qua nút
+-- "Gộp đơn cũ của tôi". Khách tự xác nhận Tên+SĐT trước khi gộp (giảm rủi ro khớp sai — 07 mục 6).

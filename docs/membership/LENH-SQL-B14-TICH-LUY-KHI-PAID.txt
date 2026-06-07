@@ -1,0 +1,100 @@
+================================================================================
+  B14 — TÍNH TÍCH LŨY/NÂNG HẠNG KHI ĐƠN VÀO 'done' HOẶC 'paid' (+ BACKFILL)
+================================================================================
+--  VÌ SAO: Tích lũy/nâng hạng cũ chỉ kích hoạt khi đơn chuyển sang 'done'.
+--  Nhưng web admin cho set trạng thái tự do nên đơn có thể nhảy thẳng 'paid'
+--  (đã thanh toán) mà KHÔNG qua 'done' → khách mất tích lũy, không lên hạng.
+--
+--  SỬA: process_order_rewards + trigger nhận CẢ 'done' lẫn 'paid'. Vẫn IDEMPOTENT
+--  nhờ cờ rewards_processed_at (đơn done->paid hay paid->done KHÔNG cộng đôi).
+--  Trigger cũng bắt cả INSERT (phòng đơn tạo thẳng 'paid').
+--
+--  AN TOÀN: chỉ CỘNG tích lũy còn thiếu, KHÔNG sửa/xóa đơn. reward_rules đang rỗng
+--  nên backfill không phát thêm voucher/quà. Chạy lại nhiều lần vẫn an toàn (idempotent).
+--------------------------------------------------------------------------------
+
+-- ── 1) Hàm xử lý thưởng: nhận cả 'done' và 'paid' (chỉ đổi điều kiện status) ──────────
+create or replace function public.process_order_rewards(p_order_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_user uuid; v_amount bigint; v_kg numeric(10,2);
+  v_locked boolean; v_old_tier text; v_new_tier text;
+begin
+  select user_id, total_amount into v_user, v_amount
+  from public.orders
+  where id = p_order_id and status in ('done','paid') and rewards_processed_at is null
+  for update;
+  if not found then return; end if;
+
+  if v_user is null then
+    update public.orders set rewards_processed_at = now() where id = p_order_id;
+    return;
+  end if;
+
+  v_kg := public.calc_order_kg(p_order_id);
+
+  select tier_code, tier_locked into v_old_tier, v_locked
+  from public.profiles where id = v_user for update;
+
+  update public.profiles
+     set lifetime_spend = lifetime_spend + v_amount,
+         lifetime_kg    = lifetime_kg + v_kg
+   where id = v_user;
+
+  if not v_locked then
+    v_new_tier := public.compute_tier(v_user);
+    if v_new_tier is distinct from v_old_tier then
+      update public.profiles set tier_code = v_new_tier, tier_updated_at = now() where id = v_user;
+      insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor, ref_order_id)
+      values (v_user, 'tier_up', v_old_tier, v_new_tier, 'system', p_order_id);
+    end if;
+  end if;
+
+  perform public.apply_reward_rules(p_order_id, v_user, v_amount, v_kg);
+
+  update public.orders set rewards_processed_at = now() where id = p_order_id;
+  insert into public.membership_events(user_id, event_type, amount, actor, ref_order_id)
+  values (v_user, 'accrual', v_amount, 'system', p_order_id);
+end;
+$function$;
+
+-- ── 2) Trigger: kích hoạt khi đơn VÀO 'done' hoặc 'paid' (chống cộng đôi) ─────────────
+create or replace function public.trg_order_done()
+returns trigger language plpgsql as $function$
+begin
+  if new.status in ('done','paid')
+     and new.rewards_processed_at is null
+     and (tg_op = 'INSERT' or coalesce(old.status,'') not in ('done','paid')) then
+    perform public.process_order_rewards(new.id);
+  end if;
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_orders_done on public.orders;
+create trigger trg_orders_done
+  after insert or update of status on public.orders
+  for each row execute function public.trg_order_done();
+
+-- ── 3) BACKFILL: cộng tích lũy cho các đơn done/paid cũ chưa xử lý ─────────────────────
+--     (đơn user_id null chỉ được đánh dấu đã xử lý, không cộng cho ai)
+do $$
+declare r record;
+begin
+  for r in
+    select id from public.orders
+    where status in ('done','paid') and rewards_processed_at is null
+    order by created_at
+  loop
+    perform public.process_order_rewards(r.id);
+  end loop;
+end $$;
+
+-- ── 4) KIỂM TRA NHANH sau khi chạy ───────────────────────────────────────────────────
+-- select tier_code, lifetime_spend from public.profiles
+-- where id = '1b660080-2093-4260-9c21-2dadd3aacab6';   -- admin → kỳ vọng 'silver', 1.980.000
+-- ================================ HẾT B14 ================================

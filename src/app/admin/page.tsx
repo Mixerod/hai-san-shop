@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import MembershipAdmin from "@/components/membership/MembershipAdmin";
 import {
   Package,
   Loader2,
@@ -287,7 +288,7 @@ export default function AdminPage() {
   };
 
   // Preparation stats states
-  const [activeTab, setActiveTab] = useState<"orders" | "products" | "feedbacks">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "products" | "feedbacks" | "membership">("orders");
   const [subTab, setSubTab] = useState<'list' | 'preparation'>('list');
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [selectedChatUser, setSelectedChatUser] = useState<string | null>(null);
@@ -1401,7 +1402,8 @@ export default function AdminPage() {
           {[
             { id: 'orders', label: 'Đơn hàng' },
             { id: 'products', label: 'Thêm sản phẩm' },
-            { id: 'feedbacks', label: 'Góp ý', badge: feedbacks.length }
+            { id: 'feedbacks', label: 'Góp ý', badge: feedbacks.length },
+            { id: 'membership', label: 'Thành viên' },
           ].map(tab => {
             const isActive = activeTab === tab.id;
             return (
@@ -3101,6 +3103,12 @@ export default function AdminPage() {
             </div>
           );
         })()}
+
+        {activeTab === 'membership' && (
+          <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
+            <MembershipAdmin />
+          </div>
+        )}
 
           </div>
         </div>
