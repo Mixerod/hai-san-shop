@@ -341,6 +341,14 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
     ? 'tier-bg-diamond'
     : ''
 
+  const tierIconBoxClass = isSilver
+    ? 'tier-icon-box-silver'
+    : isGold
+    ? 'tier-icon-box-gold'
+    : isDiamond
+    ? 'tier-icon-box-diamond'
+    : ''
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* ─── KHỐI A — Thẻ hạng hiện tại ─────────────────────────────────────────── */}
@@ -357,13 +365,13 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
         <div className="relative p-6 sm:p-8">
           <div className="flex items-center gap-4">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
-              style={{
+              className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg shrink-0 ${tierIconBoxClass}`}
+              style={!tierIconBoxClass ? {
                 background: `linear-gradient(135deg, ${tierColor}, ${tierColor}cc)`,
                 boxShadow: `0 10px 25px -5px ${tierColor}55`,
-              }}
+              } : undefined}
             >
-              <Crown className="w-8 h-8 text-white" />
+              <Crown className="w-8 h-8 text-white animate-crown" />
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
