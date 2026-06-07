@@ -171,3 +171,158 @@ body {
     padding-top: 1.5rem;
   }
 }
+
+/* =========================================================
+   Membership Tier Shiny & Sparkling Effects
+   ========================================================= */
+
+@keyframes metallic-shine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes glow-silver {
+  0%, 100% {
+    text-shadow: 0 0 6px rgba(255, 255, 255, 0.4), 0 0 12px rgba(148, 163, 184, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 20px rgba(148, 163, 184, 0.6);
+  }
+}
+
+@keyframes glow-gold {
+  0%, 100% {
+    text-shadow: 0 0 6px rgba(253, 224, 71, 0.4), 0 0 12px rgba(217, 119, 6, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(253, 224, 71, 0.8), 0 0 22px rgba(217, 119, 6, 0.7);
+  }
+}
+
+@keyframes glow-diamond {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.6), 0 0 16px rgba(6, 182, 212, 0.4), 0 0 24px rgba(168, 85, 247, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 16px rgba(255, 255, 255, 0.9), 0 0 28px rgba(6, 182, 212, 0.8), 0 0 36px rgba(168, 85, 247, 0.6);
+  }
+}
+
+@keyframes holographic-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 1. Silver (Bạc) - Glossy, metallic silver gradient with shimmer + glow */
+.tier-text-silver {
+  background: linear-gradient(
+    90deg,
+    #707f94 0%,
+    #cbd5e1 15%,
+    #f1f5f9 30%,
+    #ffffff 45%,
+    #f1f5f9 55%,
+    #cbd5e1 70%,
+    #707f94 85%,
+    #707f94 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: metallic-shine 3s linear infinite, glow-silver 3s ease-in-out infinite;
+  display: inline-block;
+  font-weight: 950;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+/* 2. Gold (Vàng) - Glossy, metallic rich gold gradient with shimmer + gold glow */
+.tier-text-gold {
+  background: linear-gradient(
+    90deg,
+    #b45309 0%,
+    #fbbf24 15%,
+    #fef08a 30%,
+    #ffffff 45%,
+    #fef08a 55%,
+    #fbbf24 70%,
+    #b45309 85%,
+    #b45309 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: metallic-shine 3s linear infinite, glow-gold 3s ease-in-out infinite;
+  display: inline-block;
+  font-weight: 950;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+/* 3. Diamond (Kim Cương) - Shimmering cyan-purple-white holographic diamond effect */
+.tier-text-diamond {
+  background: linear-gradient(
+    90deg,
+    #06b6d4 0%,
+    #22d3ee 15%,
+    #a5f3fc 30%,
+    #ffffff 45%,
+    #fbcfe8 60%,
+    #c084fc 80%,
+    #06b6d4 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: metallic-shine 3.5s linear infinite, glow-diamond 3s ease-in-out infinite;
+  display: inline-block;
+  font-weight: 950;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.15));
+}
+
+/* Card borders and glowing effects for premium tiers */
+.tier-card-silver {
+  border-color: #cbd5e1 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.12), 0 2px 8px -1px rgba(148, 163, 184, 0.08) !important;
+}
+.tier-card-silver:hover {
+  box-shadow: 0 20px 40px -4px rgba(148, 163, 184, 0.25), 0 0 20px 2px rgba(255, 255, 255, 0.6) inset !important;
+}
+
+.tier-card-gold {
+  border-color: #fbbf24 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%) !important;
+  box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.15), 0 2px 8px -1px rgba(245, 158, 11, 0.08) !important;
+}
+.tier-card-gold:hover {
+  box-shadow: 0 20px 40px -4px rgba(245, 158, 11, 0.3), 0 0 20px 2px rgba(255, 255, 255, 0.6) inset !important;
+}
+
+.tier-card-diamond {
+  border-color: #06b6d4 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #ecfeff 100%) !important;
+  box-shadow: 0 4px 20px -2px rgba(6, 182, 212, 0.18), 0 2px 8px -1px rgba(168, 85, 247, 0.1) !important;
+}
+.tier-card-diamond:hover {
+  box-shadow: 0 20px 40px -4px rgba(6, 182, 212, 0.35), 0 0 25px 2px rgba(255, 255, 255, 0.7) inset !important;
+}
+
+/* Decoration background gradients for premium tiers */
+.tier-bg-silver {
+  background: linear-gradient(135deg, rgba(203, 213, 225, 0.6), rgba(241, 245, 249, 0.1)) !important;
+}
+.tier-bg-gold {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.5), rgba(253, 224, 71, 0.05)) !important;
+}
+.tier-bg-diamond {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.5), rgba(168, 85, 247, 0.3), rgba(251, 207, 232, 0.15)) !important;
+  background-size: 300% 300% !important;
+  animation: holographic-shift 8s ease infinite !important;
+}

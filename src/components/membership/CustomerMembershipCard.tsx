@@ -130,6 +130,25 @@ function normalizePerks(raw: unknown): string[] {
   return []
 }
 
+// Chuẩn hoá để so trùng quyền lợi: bỏ khoảng trắng thừa + thường hoá.
+function normalizePerkKey(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+// Lọc perks tuỳ biến trong DB để KHÔNG lặp lại các chip auto (giảm %/free ship)
+// và không lặp chính nó. Vd DB lưu "Giảm 2% mọi đơn" trùng với chip auto -> bỏ.
+function dedupePerks(perks: string[], autoPerks: string[]): string[] {
+  const seen = new Set(autoPerks.map(normalizePerkKey))
+  const result: string[] = []
+  for (const perk of perks) {
+    const key = normalizePerkKey(perk)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(perk)
+  }
+  return result
+}
+
 // Quan hệ join (to-one) đôi khi được supabase-js trả về dạng mảng 1 phần tử — lấy phần tử đầu.
 function pickOne<T>(rel: unknown): T | null {
   if (Array.isArray(rel)) return (rel[0] as T) ?? null
@@ -293,17 +312,46 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
 
   const tierColor = currentTier?.color || DEFAULT_TIER_COLOR
 
+  const tierCode = currentTier?.code || 'member'
+  const isSilver = tierCode === 'silver'
+  const isGold = tierCode === 'gold'
+  const isDiamond = tierCode === 'diamond'
+
+  const tierTextClass = isSilver
+    ? 'tier-text-silver'
+    : isGold
+    ? 'tier-text-gold'
+    : isDiamond
+    ? 'tier-text-diamond'
+    : ''
+
+  const tierCardClass = isSilver
+    ? 'tier-card-silver'
+    : isGold
+    ? 'tier-card-gold'
+    : isDiamond
+    ? 'tier-card-diamond'
+    : ''
+
+  const tierBgClass = isSilver
+    ? 'tier-bg-silver'
+    : isGold
+    ? 'tier-bg-gold'
+    : isDiamond
+    ? 'tier-bg-diamond'
+    : ''
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* ─── KHỐI A — Thẻ hạng hiện tại ─────────────────────────────────────────── */}
       <div
-        className="relative overflow-hidden bg-white border rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500"
-        style={{ borderColor: `${tierColor}33` }}
+        className={`relative overflow-hidden bg-white border rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 ${tierCardClass}`}
+        style={!tierCardClass ? { borderColor: `${tierColor}33` } : undefined}
       >
         {/* Dải màu trang trí theo màu hạng */}
         <div
-          className="absolute inset-x-0 top-0 h-28 opacity-[0.07]"
-          style={{ background: `linear-gradient(135deg, ${tierColor}, transparent)` }}
+          className={`absolute inset-x-0 top-0 h-28 opacity-[0.07] ${tierBgClass}`}
+          style={!tierBgClass ? { background: `linear-gradient(135deg, ${tierColor}, transparent)` } : undefined}
         />
 
         <div className="relative p-6 sm:p-8">
@@ -321,7 +369,10 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
                 Hạng thành viên
               </p>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none" style={{ color: tierColor }}>
+              <h2
+                className={`text-2xl sm:text-3xl font-black tracking-tight leading-none ${tierTextClass}`}
+                style={!tierTextClass ? { color: tierColor } : undefined}
+              >
                 {currentTier?.name ?? 'Thành viên'}
               </h2>
             </div>
@@ -344,38 +395,49 @@ export default function CustomerMembershipCard({ userId }: { userId: string }) {
           </div>
 
           {/* Quyền lợi hạng hiện tại */}
-          {currentTier && (
-            <div className="mt-6">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                Quyền lợi của bạn
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {currentTier.discount_percent > 0 && (
-                  <Perk icon={<Percent className="w-3.5 h-3.5" />} color={tierColor}>
-                    Giảm {currentTier.discount_percent}% mọi đơn
-                  </Perk>
-                )}
-                {currentTier.free_ship && (
-                  <Perk icon={<Truck className="w-3.5 h-3.5" />} color={tierColor}>
-                    Free ship khu vực Thủ Đức
-                  </Perk>
-                )}
-                {currentTier.perks.map((perk) => (
-                  <Perk key={perk} icon={<Sparkles className="w-3.5 h-3.5" />} color={tierColor}>
-                    {perk}
-                  </Perk>
-                ))}
-                {currentTier.discount_percent === 0 &&
-                  !currentTier.free_ship &&
-                  currentTier.perks.length === 0 && (
-                    <p className="text-xs text-slate-400 font-medium italic">
+          {currentTier && (() => {
+            // Chip auto từ cờ hạng (giảm %/free ship) — dựng trước để lọc trùng với perks tuỳ biến.
+            const autoPerks: string[] = []
+            if (currentTier.discount_percent > 0) {
+              autoPerks.push(`Giảm ${currentTier.discount_percent}% mọi đơn`)
+            }
+            if (currentTier.free_ship) {
+              autoPerks.push('Free ship khu vực Thủ Đức')
+            }
+            const extraPerks = dedupePerks(currentTier.perks, autoPerks)
+            const hasNoPerks = autoPerks.length === 0 && extraPerks.length === 0
+
+            return (
+              <div className="mt-6">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" style={{ color: tierColor }} />
+                  Quyền lợi của bạn
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {currentTier.discount_percent > 0 && (
+                    <Perk icon={<Percent className="w-3.5 h-3.5" />} color={tierColor}>
+                      Giảm {currentTier.discount_percent}% mọi đơn
+                    </Perk>
+                  )}
+                  {currentTier.free_ship && (
+                    <Perk icon={<Truck className="w-3.5 h-3.5" />} color={tierColor}>
+                      Free ship khu vực Thủ Đức
+                    </Perk>
+                  )}
+                  {extraPerks.map((perk) => (
+                    <Perk key={perk} icon={<Sparkles className="w-3.5 h-3.5" />} color={tierColor}>
+                      {perk}
+                    </Perk>
+                  ))}
+                  {hasNoPerks && (
+                    <p className="text-xs text-slate-500 font-medium italic">
                       Hãy mua sắm để lên hạng và nhận ưu đãi nhé!
                     </p>
                   )}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
       </div>
 
@@ -826,12 +888,16 @@ function Perk({
   color: string
   children: React.ReactNode
 }) {
+  // Chữ dùng slate-800 cố định để luôn dễ đọc, không phụ thuộc màu hạng (có hạng màu nhạt).
+  // Màu hạng vẫn được giữ ở icon + viền + nền tinted để tạo điểm nhấn.
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border"
-      style={{ backgroundColor: `${color}12`, borderColor: `${color}33`, color }}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border text-slate-800 shadow-sm"
+      style={{ backgroundColor: `${color}1f`, borderColor: `${color}66` }}
     >
-      {icon}
+      <span className="shrink-0" style={{ color }}>
+        {icon}
+      </span>
       {children}
     </span>
   )
