@@ -367,12 +367,14 @@ export default function AdminPage() {
     total_sold: 0,
     in_stock: true,
     note: '',
-    category: 'haisan',
+    category: '',
     original_price: null as number | null,
     tag: 'none'
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
+  // Danh mục: mặc định chọn từ các danh mục có sẵn trong DB; bật mode này để gõ tay danh mục mới
+  const [newCategoryMode, setNewCategoryMode] = useState(false);
 
   // Upload 1 file ảnh lên Storage rồi gắn URL vào form — dùng chung cho cả
   // chọn file lẫn dán ảnh từ clipboard (Ctrl+V).
@@ -477,10 +479,11 @@ export default function AdminPage() {
         total_sold: 0,
         in_stock: true,
         note: '',
-        category: 'haisan',
+        category: '',
         original_price: null,
         tag: 'none'
       });
+      setNewCategoryMode(false);
       // Refresh danh sách sản phẩm sau khi thêm
       fetchProductsList();
     } catch (err: any) {
@@ -538,6 +541,14 @@ export default function AdminPage() {
     created_at?: string;
   };
   const [productsList, setProductsList] = useState<ProductRow[]>([]);
+
+  // Các danh mục đang có trong DB (rút từ danh sách sản phẩm) — cho dropdown chọn nhanh
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(new Set(productsList.map(p => (p.category || '').trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b, 'vi')),
+    [productsList]
+  );
   const [loadingProductsList, setLoadingProductsList] = useState(false);
   const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<string | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
@@ -2508,14 +2519,47 @@ export default function AdminPage() {
 
                 <div className="space-y-1">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Danh Mục</label>
-                  <input
-                    type="text"
-                    value={newProduct.category || ''}
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-semibold text-sm h-11"
-                    placeholder="VD: haisan, chamuc, kho..."
-                    style={{ fontSize: '16px' }}
-                  />
+                  {!newCategoryMode ? (
+                    <select
+                      value={newProduct.category || ''}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setNewCategoryMode(true);
+                          setNewProduct({ ...newProduct, category: '' });
+                        } else {
+                          setNewProduct({ ...newProduct, category: e.target.value });
+                        }
+                      }}
+                      className="w-full bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-semibold text-sm h-11 cursor-pointer"
+                      style={{ fontSize: '16px' }}
+                    >
+                      <option value="">— Chọn danh mục có sẵn —</option>
+                      {categoryOptions.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                      <option value="__new__">+ Danh mục mới (gõ tay)...</option>
+                    </select>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newProduct.category || ''}
+                        onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                        className="flex-1 bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-semibold text-sm h-11"
+                        placeholder="Gõ tên danh mục mới..."
+                        style={{ fontSize: '16px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setNewCategoryMode(false); setNewProduct({ ...newProduct, category: '' }); }}
+                        className="shrink-0 h-11 px-3 text-xs font-bold rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-all cursor-pointer"
+                        title="Quay lại chọn danh mục có sẵn"
+                      >
+                        Chọn sẵn
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">
