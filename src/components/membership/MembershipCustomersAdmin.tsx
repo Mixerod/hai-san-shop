@@ -136,6 +136,9 @@ export default function MembershipCustomersAdmin() {
                 <p className="text-xs font-bold text-emerald-400/90">{formatVND(c.lifetime_spend)}</p>
                 <p className="text-[10px] text-gray-500">{c.lifetime_kg} kg</p>
               </div>
+              <span className="text-[10px] font-bold text-sky-400 shrink-0 whitespace-nowrap">
+                Trao hạng ▸
+              </span>
             </button>
           ))}
         </div>

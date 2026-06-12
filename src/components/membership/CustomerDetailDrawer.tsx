@@ -136,6 +136,9 @@ export default function CustomerDetailDrawer({
   const [adjSpend, setAdjSpend] = useState(customer.lifetime_spend);
   const [adjKg, setAdjKg] = useState(customer.lifetime_kg);
   const [adjReason, setAdjReason] = useState("");
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [addAmount, setAddAmount] = useState(0);
+  const [addReason, setAddReason] = useState("");
 
   const loadWallet = useCallback(async () => {
     setLoadingWallet(true);
@@ -274,6 +277,28 @@ export default function CustomerDetailDrawer({
     );
   }
 
+  function handleQuickAdd() {
+    if (addAmount <= 0) {
+      showToast("Số tiền cộng thêm phải lớn hơn 0", false);
+      return;
+    }
+    run(
+      `Đã cộng ${formatVND(addAmount)} tích lũy`,
+      () =>
+        supabase.rpc("admin_adjust_accumulation", {
+          p_user: userId,
+          p_new_spend: Math.max(0, Math.round(customer.lifetime_spend + addAmount)),
+          p_new_kg: customer.lifetime_kg,
+          p_reason: addReason.trim() || "Admin cộng tích lũy thủ công",
+        }),
+      () => {
+        setShowQuickAdd(false);
+        setAddAmount(0);
+        setAddReason("");
+      },
+    );
+  }
+
   function handleAdjust() {
     if (!adjReason.trim()) {
       showToast("Điều chỉnh tích lũy bắt buộc nhập lý do", false);
@@ -386,22 +411,72 @@ export default function CustomerDetailDrawer({
           {/* TÍCH LŨY */}
           <Section
             icon={<SlidersHorizontal className="w-4 h-4 text-sky-400" />}
-            title="Điều chỉnh tích lũy"
+            title="Tích lũy chi tiêu"
           >
-            {!showAdjust ? (
-              <ActionBtn
-                onClick={() => {
-                  setAdjSpend(customer.lifetime_spend);
-                  setAdjKg(customer.lifetime_kg);
-                  setShowAdjust(true);
-                }}
-                disabled={busy}
-                variant="ghost"
-                icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
-              >
-                Điều chỉnh tích lũy (hiếm dùng)
-              </ActionBtn>
-            ) : (
+            {showQuickAdd && (
+              <div className="space-y-3 mb-3">
+                <Field label="Cộng thêm vào tích lũy (đ)">
+                  <input
+                    type="number"
+                    min={0}
+                    step={10000}
+                    value={addAmount || ""}
+                    onChange={(e) => setAddAmount(Math.max(0, Number(e.target.value)))}
+                    placeholder="VD: 2000000"
+                    className={inputClass}
+                  />
+                </Field>
+                {addAmount > 0 && (
+                  <p className="text-[11px] text-sky-300">
+                    Tích lũy mới: <b>{formatVND(customer.lifetime_spend + addAmount)}</b> — nếu đủ
+                    mốc, hạng sẽ tự nâng ngay (trừ khi đang khóa hạng).
+                  </p>
+                )}
+                <Field label="Lý do (tuỳ chọn)">
+                  <input
+                    value={addReason}
+                    onChange={(e) => setAddReason(e.target.value)}
+                    placeholder="VD: khách mua sỉ ngoài web"
+                    className={inputClass}
+                  />
+                </Field>
+                <div className="flex gap-2">
+                  <ActionBtn onClick={handleQuickAdd} disabled={busy} icon={<Save className="w-3.5 h-3.5" />}>
+                    Cộng tiền
+                  </ActionBtn>
+                  <ActionBtn onClick={() => setShowQuickAdd(false)} disabled={busy} variant="ghost">
+                    Huỷ
+                  </ActionBtn>
+                </div>
+              </div>
+            )}
+            {!showAdjust && !showQuickAdd ? (
+              <div className="flex flex-wrap gap-2">
+                <ActionBtn
+                  onClick={() => {
+                    setAddAmount(0);
+                    setAddReason("");
+                    setShowQuickAdd(true);
+                  }}
+                  disabled={busy}
+                  icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
+                >
+                  Cộng tiền tích lũy
+                </ActionBtn>
+                <ActionBtn
+                  onClick={() => {
+                    setAdjSpend(customer.lifetime_spend);
+                    setAdjKg(customer.lifetime_kg);
+                    setShowAdjust(true);
+                  }}
+                  disabled={busy}
+                  variant="ghost"
+                  icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
+                >
+                  Sửa số tuyệt đối (hiếm dùng)
+                </ActionBtn>
+              </div>
+            ) : showAdjust ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Tổng chi tiêu (đ)">
@@ -441,7 +516,7 @@ export default function CustomerDetailDrawer({
                   </ActionBtn>
                 </div>
               </div>
-            )}
+            ) : null}
           </Section>
 
           {/* TRAO VOUCHER */}

@@ -15,15 +15,15 @@ import MembershipCustomersAdmin from "./MembershipCustomersAdmin";
 type SubTab = "tiers" | "vouchers" | "gifts" | "rules" | "customers";
 
 const TABS: { id: SubTab; label: string; icon: typeof Crown; disabled?: boolean }[] = [
+  { id: "customers", label: "Khách hàng (trao hạng)", icon: Users },
   { id: "tiers", label: "Hạng thành viên", icon: Crown },
   { id: "vouchers", label: "Voucher", icon: Ticket },
   { id: "gifts", label: "Quà tặng", icon: Gift },
   { id: "rules", label: "Mốc thưởng", icon: Target },
-  { id: "customers", label: "Khách hàng", icon: Users },
 ];
 
 export default function MembershipAdmin() {
-  const [tab, setTab] = useState<SubTab>("tiers");
+  const [tab, setTab] = useState<SubTab>("customers");
 
   return (
     <div className="flex flex-col gap-5">
