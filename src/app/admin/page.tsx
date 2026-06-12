@@ -374,13 +374,15 @@ export default function AdminPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Upload 1 file ảnh lên Storage rồi gắn URL vào form — dùng chung cho cả
+  // chọn file lẫn dán ảnh từ clipboard (Ctrl+V).
+  const uploadImageFile = async (file: File) => {
     setUploadingImage(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      // Ảnh dán từ clipboard thường tên "image.png"; suy ra đuôi từ MIME nếu thiếu.
+      const fileExt = file.name.includes('.')
+        ? file.name.split('.').pop()
+        : (file.type.split('/')[1] || 'png');
       // Loại bỏ dấu câu và khoảng trắng khỏi tên file, thêm timestamp để không bị trùng
       const safeName = file.name.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
       const fileName = `${Date.now()}_${safeName}.${fileExt}`;
@@ -420,6 +422,35 @@ export default function AdminPage() {
       setUploadingImage(false);
     }
   };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await uploadImageFile(file);
+    // Cho phép chọn lại đúng file cũ nếu muốn upload lại
+    e.target.value = '';
+  };
+
+  // Dán ảnh (Ctrl+V) ở bất kỳ đâu trong tab Sản phẩm → tự upload như chọn file.
+  useEffect(() => {
+    if (activeTab !== 'products') return;
+    const onPaste = (e: ClipboardEvent) => {
+      // Bỏ qua khi đang dán chữ vào ô nhập liệu (chỉ bắt khi clipboard có ảnh)
+      const items = e.clipboardData?.items;
+      if (!items || uploadingImage) return;
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            uploadImageFile(file);
+          }
+          return;
+        }
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [activeTab, uploadingImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2452,8 +2483,11 @@ export default function AdminPage() {
                         <span>Tải ảnh lên hệ thống</span>
                         <input type="file" className="sr-only" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} />
                       </label>
+                      <span className="inline-flex items-center gap-1 ml-0 sm:ml-2 mt-2 sm:mt-0 px-2.5 h-7 text-[10px] font-bold rounded-lg border border-sky-500/30 bg-sky-500/10 text-sky-300 select-none">
+                        hoặc dán ảnh: Ctrl + V
+                      </span>
                       <p className="mt-2 text-[10px] sm:text-xs text-gray-400 font-medium">
-                        Hỗ trợ định dạng ảnh phổ biến. Ảnh sẽ được upload và lấy link trực tiếp từ Supabase Storage.
+                        Chọn file hoặc copy ảnh từ bất kỳ đâu rồi bấm Ctrl+V ngay tại trang này — ảnh sẽ tự upload lên Supabase Storage.
                       </p>
                     </div>
                   </div>
