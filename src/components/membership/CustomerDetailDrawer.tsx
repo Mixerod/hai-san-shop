@@ -96,6 +96,7 @@ const EVENT_LABEL: Record<string, string> = {
   accrual_adjust: "Điều chỉnh tích lũy",
   backfill: "Backfill",
   merge_guest_orders: "Gộp đơn vãng lai",
+  order_detached: "Tách đơn khỏi khách",
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────────────

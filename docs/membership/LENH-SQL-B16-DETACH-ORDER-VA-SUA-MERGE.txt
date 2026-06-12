@@ -1,0 +1,253 @@
+-- ============================================================================
+--  B16 — TÁCH ĐƠN KHỎI KHÁCH (admin_detach_order) + SỬA 2 BUG merge_guest_orders
+--        Chạy trong Supabase SQL Editor. An toàn chạy lại (create or replace).
+-- ============================================================================
+--  MÔ HÌNH TÍCH LŨY (thống nhất theo B14 — CỘNG DỒN từng đơn, KHÔNG set tuyệt đối):
+--    • Đơn được TÍNH vào lifetime_spend/kg khi: status in ('done','paid')
+--      VÀ rewards_processed_at IS NOT NULL (đã qua 1 lần xử lý).
+--    • KHÔNG bao giờ recompute tuyệt đối từ tổng đơn — vì admin có thể đã
+--      cộng/chỉnh tích lũy thủ công (admin_adjust_accumulation); recompute
+--      tuyệt đối sẽ XÓA các điều chỉnh đó.
+--  AN TOÀN ĐỆ QUY (đã kiểm 2026-06-12):
+--    • trg_orders_done chỉ bắn khi INSERT hoặc UPDATE OF status → các RPC này
+--      chỉ sửa user_id/rewards_processed_at nên KHÔNG kích hoạt trigger.
+--    • process_order_rewards chỉ chạy khi status chuyển sang done/paid lần đầu
+--      và rewards_processed_at null; bên trong nó set rewards_processed_at
+--      (không đụng status) → không tự gọi lại. Không có vòng lặp.
+--  KHÓA HÀNG LANG (chống deadlock): mọi RPC đều khóa ĐƠN trước, PROFILE sau.
+-- ----------------------------------------------------------------------------
+
+-- ============================================================================
+--  1) SỬA merge_guest_orders (B13 — khách tự gộp ở /profile). 2 bug được sửa:
+--     (a) CŨ: set lifetime tuyệt đối từ đơn 'done' → xóa điều chỉnh thủ công
+--         của admin + bỏ sót đơn 'paid'.  MỚI: cộng DỒN đúng phần đơn vừa gộp.
+--     (b) CŨ: set rewards_processed_at cho CẢ đơn pending → đơn không bao giờ
+--         được tích lũy khi hoàn tất.  MỚI: chỉ đánh dấu đơn đã done/paid;
+--         đơn chưa xong giữ NULL để trigger thường xử lý như đơn bình thường.
+-- ============================================================================
+create or replace function public.merge_guest_orders(p_name text, p_phone text)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user      uuid := auth.uid();
+  v_phone     text;
+  v_name      text;
+  v_count     int := 0;
+  v_add_spend bigint := 0;
+  v_add_kg    numeric := 0;
+  v_old       text;
+  v_new       text;
+  v_locked    boolean;
+begin
+  if v_user is null then
+    raise exception 'Phải đăng nhập để gộp đơn';
+  end if;
+
+  -- Chuẩn hóa: SĐT bỏ ký tự không phải số; Tên lower+trim.
+  v_phone := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+  v_name  := lower(btrim(coalesce(p_name, '')));
+
+  -- CHẶN KHỚP LỎNG: SĐT < 9 số hoặc tên rỗng → không gộp (tránh gộp nhầm).
+  if length(v_phone) < 9 or v_name = '' then
+    return 0;
+  end if;
+
+  -- Gán chủ các đơn vãng lai khớp CẢ Tên VÀ SĐT trong note.
+  -- Chỉ chặn thưởng hồi tố (set rewards_processed_at) với đơn ĐÃ done/paid.
+  with cand as (
+    select id, status from public.orders
+    where user_id is null
+      and regexp_replace(coalesce(note, ''), '\D', '', 'g') like '%' || v_phone || '%'
+      and position(v_name in lower(coalesce(note, ''))) > 0
+  ), upd as (
+    update public.orders o
+       set user_id = v_user,
+           rewards_processed_at = case
+             when c.status in ('done', 'paid')
+               then coalesce(o.rewards_processed_at, now())
+             else o.rewards_processed_at
+           end
+    from cand c
+    where o.id = c.id
+    returning o.id, o.status, o.total_amount
+  )
+  select count(*),
+         coalesce(sum(total_amount)            filter (where status in ('done','paid')), 0)::bigint,
+         coalesce(sum(public.calc_order_kg(id)) filter (where status in ('done','paid')), 0)
+    into v_count, v_add_spend, v_add_kg
+  from upd;
+
+  if v_count = 0 then
+    return 0;
+  end if;
+
+  -- CỘNG DỒN tích lũy (không set tuyệt đối — giữ nguyên điều chỉnh thủ công).
+  select tier_code, tier_locked into v_old, v_locked
+  from public.profiles where id = v_user for update;
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ khách';
+  end if;
+
+  update public.profiles
+     set lifetime_spend = lifetime_spend + v_add_spend,
+         lifetime_kg    = lifetime_kg + v_add_kg
+   where id = v_user;
+
+  if not v_locked then
+    v_new := public.compute_tier(v_user);
+    if v_new is distinct from v_old then
+      update public.profiles set tier_code = v_new, tier_updated_at = now() where id = v_user;
+      insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor)
+      values (v_user, 'tier_recompute', v_old, v_new, 'system');
+    end if;
+  end if;
+
+  -- Audit để truy vết & hoàn tác nếu khớp sai.
+  insert into public.membership_events(user_id, event_type, amount, actor, metadata)
+  values (v_user, 'merge_guest_orders', v_count, 'system',
+          jsonb_build_object('name', v_name, 'phone', v_phone,
+                             'added_spend', v_add_spend, 'added_kg', v_add_kg));
+  return v_count;
+end;
+$$;
+
+-- ============================================================================
+--  2) admin_detach_order — TÁCH 1 đơn khỏi khách → về đơn vãng lai (user_id null)
+--     Dùng khi khách đặt DÙM người khác: tách ra rồi kéo-thả gộp cho đúng chủ.
+--     • Chỉ TRỪ tích lũy nếu đơn ĐÃ được tính (done/paid + đã xử lý thưởng).
+--       Sàn 0 (greatest) — phòng khi admin từng chỉnh tay xuống thấp hơn.
+--     • GIỮ rewards_processed_at: gộp lại sau này sẽ được cộng tích lũy
+--       nhưng KHÔNG phát voucher/quà lần 2 (chống double-reward).
+--     • Tính lại hạng (có thể XUỐNG hạng) nếu khách không bị khóa hạng.
+-- ============================================================================
+create or replace function public.admin_detach_order(
+  p_order  uuid,
+  p_reason text
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_owner   uuid;
+  v_status  text;
+  v_amount  bigint;
+  v_rpa     timestamptz;
+  v_kg      numeric := 0;
+  v_counted boolean;
+  v_old     text;
+  v_new     text;
+  v_locked  boolean;
+  v_actor   text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+
+  -- Khóa ĐƠN trước (cùng thứ tự khóa với admin_merge_guest_order — chống deadlock).
+  select o.user_id, o.status, o.total_amount::bigint, o.rewards_processed_at
+    into v_owner, v_status, v_amount, v_rpa
+  from public.orders o where o.id = p_order for update;
+  if not found then
+    raise exception 'Đơn không tồn tại';
+  end if;
+  if v_owner is null then
+    raise exception 'Đơn này đã là đơn vãng lai';
+  end if;
+
+  -- Đơn ĐÃ được tính tích lũy? (done/paid + đã qua xử lý thưởng)
+  v_counted := v_status in ('done', 'paid') and v_rpa is not null;
+  if v_counted then
+    v_kg := coalesce(public.calc_order_kg(p_order), 0);
+  end if;
+
+  -- Tách về vãng lai (không đụng status → không kích hoạt trg_orders_done).
+  update public.orders set user_id = null where id = p_order;
+
+  -- Khóa PROFILE sau, trừ tích lũy nếu đơn đã được tính, rồi áp lại hạng.
+  select tier_code, tier_locked into v_old, v_locked
+  from public.profiles where id = v_owner for update;
+  if found then
+    if v_counted then
+      update public.profiles
+         set lifetime_spend = greatest(0, lifetime_spend - coalesce(v_amount, 0)),
+             lifetime_kg    = greatest(0, lifetime_kg - v_kg)
+       where id = v_owner;
+    end if;
+    if not v_locked then
+      v_new := public.compute_tier(v_owner);
+      if v_new is distinct from v_old then
+        update public.profiles set tier_code = v_new, tier_updated_at = now() where id = v_owner;
+        insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor, ref_order_id)
+        values (v_owner, 'tier_recompute', v_old, v_new, v_actor, p_order);
+      end if;
+    end if;
+  end if;
+
+  insert into public.membership_events(user_id, event_type, amount, reason, actor, ref_order_id, metadata)
+  values (
+    v_owner, 'order_detached', coalesce(v_amount, 0),
+    nullif(btrim(coalesce(p_reason, '')), ''), v_actor, p_order,
+    jsonb_build_object('order_status', v_status, 'accrual_reverted', v_counted)
+  );
+end;
+$$;
+
+-- ============================================================================
+--  3) admin_list_user_orders — đơn của 1 khách (cho UI chọn đơn cần tách).
+-- ============================================================================
+create or replace function public.admin_list_user_orders(p_user uuid)
+returns table (
+  id                   uuid,
+  note                 text,
+  total_amount         numeric,
+  status               text,
+  payment_status       text,
+  created_at           timestamptz,
+  rewards_processed_at timestamptz
+)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  return query
+    select o.id, o.note, o.total_amount, o.status, o.payment_status,
+           o.created_at, o.rewards_processed_at
+    from public.orders o
+    where o.user_id = p_user
+    order by o.created_at desc
+    limit 100;
+end;
+$$;
+
+-- ============================================================================
+--  4) Quyền gọi (RPC tự kiểm bên trong → chỉ cấp authenticated).
+-- ============================================================================
+grant execute on function public.merge_guest_orders(text,text)      to authenticated;
+grant execute on function public.admin_detach_order(uuid,text)      to authenticated;
+grant execute on function public.admin_list_user_orders(uuid)       to authenticated;
+
+-- ============================================================================
+--  BẢNG TÌNH HUỐNG ĐÃ RÀ (trước/sau, không sót):
+--  ┌────────────────────────────────────────────┬──────────────────────────────┐
+--  │ Gộp đơn done/paid (kéo-thả admin)          │ +spend/kg ngay, không thưởng │
+--  │                                            │ hồi tố, hạng tự nâng         │
+--  │ Gộp đơn pending (kéo-thả admin)            │ chỉ gán chủ; khi đơn xong:   │
+--  │                                            │ trigger cộng + phát thưởng   │
+--  │ Gộp 2 lần cùng 1 đơn                       │ lần 2 lỗi "đã có chủ"        │
+--  │ Tách đơn done/paid (đã tính tích lũy)      │ −spend/kg, hạng có thể xuống │
+--  │ Tách đơn pending (chưa tính)               │ chỉ bỏ chủ, spend giữ nguyên │
+--  │ Tách rồi gộp lại (done/paid)               │ cộng lại đúng 1 lần, KHÔNG   │
+--  │                                            │ phát thưởng lần 2 (giữ rpa)  │
+--  │ Tách đơn của khách đã chỉnh tích lũy tay   │ trừ đúng phần đơn, KHÔNG mất │
+--  │                                            │ phần cộng tay (cộng dồn)     │
+--  │ Khách tự gộp ở /profile sau khi admin đã   │ chỉ cộng phần đơn mới gộp,   │
+--  │ cộng tiền tay                              │ không xóa phần cộng tay      │
+--  │ Khách tự gộp đơn pending                   │ rpa giữ NULL → vẫn tích lũy  │
+--  │                                            │ + thưởng khi đơn hoàn tất    │
+--  │ Hạng đang khóa (tier_locked)               │ spend vẫn cập nhật, hạng     │
+--  │                                            │ KHÔNG đổi cho tới khi mở khóa│
+--  │ Đệ quy trigger                             │ không xảy ra (xem đầu file)  │
+--  └────────────────────────────────────────────┴──────────────────────────────┘
+-- DONE B16.

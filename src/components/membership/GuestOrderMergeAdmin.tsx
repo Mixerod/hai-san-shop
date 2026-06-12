@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MousePointerClick,
+  Scissors,
 } from "lucide-react";
 import { formatVND, formatDateShort, inputClass, useToast, ToastView, Field, Modal } from "./ui";
 import { TierBadge, type CustomerRow } from "./CustomerDetailDrawer";
@@ -30,6 +31,16 @@ type GuestOrder = {
   payment_status: string | null;
   created_at: string;
   total_count: number;
+};
+
+type UserOrder = {
+  id: string;
+  note: string | null;
+  total_amount: number;
+  status: string;
+  payment_status: string | null;
+  created_at: string;
+  rewards_processed_at: string | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -89,6 +100,13 @@ export default function GuestOrderMergeAdmin() {
   const [confirm, setConfirm] = useState<{ order: GuestOrder; customer: CustomerRow } | null>(null);
   const [mergeReason, setMergeReason] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // ── tách đơn khỏi khách (admin_detach_order) ──
+  const [detachCustomer, setDetachCustomer] = useState<CustomerRow | null>(null);
+  const [userOrders, setUserOrders] = useState<UserOrder[]>([]);
+  const [loadingUserOrders, setLoadingUserOrders] = useState(false);
+  const [detachTarget, setDetachTarget] = useState<UserOrder | null>(null);
+  const [detachReason, setDetachReason] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -186,6 +204,50 @@ export default function GuestOrderMergeAdmin() {
       setBusy(false);
     }
   }
+
+  async function openDetach(c: CustomerRow) {
+    setDetachCustomer(c);
+    setDetachTarget(null);
+    setDetachReason("");
+    setLoadingUserOrders(true);
+    try {
+      const { data, error } = await supabase.rpc("admin_list_user_orders", { p_user: c.id });
+      if (error) throw error;
+      setUserOrders((data || []) as UserOrder[]);
+    } catch (err: unknown) {
+      showToast("Lỗi tải đơn của khách: " + errMsg(err), false);
+      setUserOrders([]);
+    } finally {
+      setLoadingUserOrders(false);
+    }
+  }
+
+  async function handleDetach() {
+    if (!detachCustomer || !detachTarget) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.rpc("admin_detach_order", {
+        p_order: detachTarget.id,
+        p_reason: detachReason.trim() || null,
+      });
+      if (error) throw error;
+      showToast(`Đã tách đơn ${formatVND(detachTarget.total_amount)} ra đơn vãng lai`);
+      setDetachTarget(null);
+      setDetachReason("");
+      // refresh: đơn vừa tách sẽ xuất hiện lại ở cột đơn vãng lai
+      const cust = detachCustomer;
+      await Promise.all([fetchOrders(), fetchCustomers()]);
+      await openDetach(cust);
+    } catch (err: unknown) {
+      showToast("Lỗi tách đơn: " + errMsg(err), false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Đơn đã được TÍNH tích lũy = done/paid + đã qua xử lý thưởng → tách sẽ TRỪ tiền.
+  const isCounted = (o: UserOrder) =>
+    (o.status === "done" || o.status === "paid") && o.rewards_processed_at != null;
 
   const activeOrderId = dragOrderId ?? selectedOrderId;
   const orderPages = Math.max(1, Math.ceil(orderTotal / PAGE_SIZE));
@@ -366,6 +428,13 @@ export default function GuestOrderMergeAdmin() {
                       Gộp vào đây
                     </button>
                   )}
+                  <button
+                    onClick={() => openDetach(c)}
+                    title="Tách đơn của khách này ra đơn vãng lai (đổi chủ đơn)"
+                    className="shrink-0 flex items-center gap-1 h-7 px-2 text-[11px] font-bold rounded-lg border border-gray-600 text-gray-300 hover:text-amber-300 hover:border-amber-500/50 transition-colors cursor-pointer"
+                  >
+                    <Scissors className="w-3 h-3" /> Tách
+                  </button>
                 </div>
               );
             })
@@ -431,6 +500,114 @@ export default function GuestOrderMergeAdmin() {
               className={inputClass}
             />
           </Field>
+        </Modal>
+      )}
+
+      {/* ── Modal tách đơn khỏi khách ── */}
+      {detachCustomer && (
+        <Modal
+          title={`Tách đơn — ${detachCustomer.full_name || detachCustomer.email || "khách"}`}
+          icon={<Scissors className="w-4 h-4 text-amber-400" />}
+          onClose={() => !busy && setDetachCustomer(null)}
+          footer={
+            <button
+              onClick={() => setDetachCustomer(null)}
+              disabled={busy}
+              className="h-9 px-4 text-xs font-bold rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-50 cursor-pointer transition-colors"
+            >
+              Đóng
+            </button>
+          }
+        >
+          <p className="text-[11px] text-gray-500">
+            Tách đơn ra khỏi khách → đơn trở lại cột &quot;Đơn vãng lai&quot; để kéo-thả gộp cho
+            đúng chủ (trường hợp đặt dùm). Đơn đã tính tích lũy sẽ bị TRỪ tiền tương ứng và
+            hạng tự hạ nếu tụt mốc.
+          </p>
+          {loadingUserOrders ? (
+            <div className="flex items-center justify-center py-8 text-gray-500">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              <span className="text-xs">Đang tải...</span>
+            </div>
+          ) : userOrders.length === 0 ? (
+            <p className="text-center text-xs text-gray-500 py-8 border border-dashed border-gray-700 rounded-lg">
+              Khách này chưa sở hữu đơn nào
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {userOrders.map((o) => (
+                <div
+                  key={o.id}
+                  className={`px-3.5 py-2.5 rounded-lg border transition-all ${
+                    detachTarget?.id === o.id
+                      ? "border-amber-500 bg-amber-500/10"
+                      : "border-gray-700 bg-gray-800/60"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-emerald-400/90">
+                          {formatVND(o.total_amount)}
+                        </span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${
+                            STATUS_CLASS[o.status] ?? "bg-gray-700/40 border-gray-600 text-gray-300"
+                          }`}
+                        >
+                          {STATUS_LABEL[o.status] ?? o.status}
+                        </span>
+                        {isCounted(o) && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-300 font-semibold">
+                            đã tính tích lũy
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                        {formatDateShort(o.created_at)} · {parseNote(o.note).name || "—"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setDetachTarget((cur) => (cur?.id === o.id ? null : o))}
+                      disabled={busy}
+                      className="shrink-0 flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-lg border border-amber-500/40 text-amber-300 hover:bg-amber-500/15 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      <Scissors className="w-3 h-3" /> Tách
+                    </button>
+                  </div>
+                  {detachTarget?.id === o.id && (
+                    <div className="mt-3 pt-3 border-t border-gray-700 space-y-3">
+                      <p className="text-[11px] text-amber-300">
+                        {isCounted(o)
+                          ? `Đơn này ĐÃ tính tích lũy — tách sẽ trừ ${formatVND(o.total_amount)} khỏi tổng chi tiêu của khách (hạng tự hạ nếu tụt mốc).`
+                          : "Đơn này chưa tính tích lũy — tách chỉ bỏ chủ đơn, tổng chi tiêu giữ nguyên."}
+                      </p>
+                      <Field label="Lý do (tuỳ chọn)">
+                        <input
+                          value={detachReason}
+                          onChange={(e) => setDetachReason(e.target.value)}
+                          placeholder="VD: đơn đặt dùm người khác"
+                          className={inputClass}
+                        />
+                      </Field>
+                      <button
+                        onClick={handleDetach}
+                        disabled={busy}
+                        className="h-8 px-3.5 flex items-center gap-1.5 text-[11px] font-bold rounded-lg bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 cursor-pointer transition-colors"
+                      >
+                        {busy ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Scissors className="w-3.5 h-3.5" />
+                        )}
+                        Xác nhận tách ra vãng lai
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </Modal>
       )}
     </div>

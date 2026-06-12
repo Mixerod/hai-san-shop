@@ -1,0 +1,127 @@
+-- ============================================================================
+--  B16-TEST — BỘ KIỂM THỬ GỘP/TÁCH ĐƠN (chạy thật RPC, TỰ ROLLBACK toàn bộ)
+--  Chạy trong Supabase SQL Editor. KẾT QUẢ MONG ĐỢI: lỗi có chữ "TEST_OK" =
+--  tất cả PASS và mọi thay đổi đã được hoàn tác. Lỗi khác = có bug, đọc message.
+--  (Cố ý kết thúc bằng RAISE EXCEPTION để buộc rollback — dữ liệu thật an toàn.)
+-- ============================================================================
+do $body$
+declare
+  v_admin_claims text := '{"email":"minhquyet08122003@gmail.com","role":"authenticated"}';
+  v_cust uuid; v_cust_email text;
+  v_paid uuid; v_amt bigint;            -- đơn vãng lai paid/done có sẵn
+  v_pending uuid; v_amt_pend bigint;    -- đơn vãng lai pending có sẵn
+  v_tmp_done uuid; v_tmp_pend uuid;     -- đơn tạm tạo trong test
+  v_spend0 bigint; v_spend bigint; v_tier text;
+  v_uid uuid; v_rpa timestamptz; v_cnt int;
+begin
+  -- Giả lập phiên ADMIN (auth.email() đọc từ request.jwt.claims)
+  perform set_config('request.jwt.claims', v_admin_claims, true);
+
+  -- ── SETUP: chọn dữ liệu thật ──
+  select id, email into v_cust, v_cust_email
+  from public.profiles where email = 'quyetle08122003@gmail.com';
+  select id, total_amount::bigint into v_paid, v_amt
+  from public.orders where user_id is null and status in ('done','paid')
+  order by created_at desc limit 1;
+  select id, total_amount::bigint into v_pending, v_amt_pend
+  from public.orders where user_id is null and status = 'pending'
+  order by created_at desc limit 1;
+  if v_cust is null or v_paid is null or v_pending is null then
+    raise exception 'SETUP FAIL: thiếu dữ liệu test (cust=%, paid=%, pending=%)', v_cust, v_paid, v_pending;
+  end if;
+  select lifetime_spend into v_spend0 from public.profiles where id = v_cust;
+
+  -- ── TEST 1: gộp đơn paid → gán chủ + spend tăng ĐÚNG total_amount ──
+  perform public.admin_merge_guest_order(v_paid, v_cust, 'T1');
+  select user_id, rewards_processed_at into v_uid, v_rpa from public.orders where id = v_paid;
+  if v_uid is distinct from v_cust then raise exception 'T1 FAIL: user_id không được gán'; end if;
+  if v_rpa is null then raise exception 'T1 FAIL: rewards_processed_at phải được set'; end if;
+  select lifetime_spend into v_spend from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 + v_amt then raise exception 'T1 FAIL: spend=% mong đợi=%', v_spend, v_spend0 + v_amt; end if;
+
+  -- ── TEST 2: gộp LẦN 2 cùng đơn → phải bị chặn "đã có chủ" ──
+  begin
+    perform public.admin_merge_guest_order(v_paid, v_cust, 'T2');
+    raise exception 'T2 FAIL: không chặn gộp 2 lần';
+  exception when others then
+    if sqlerrm like 'T2 FAIL%' then raise; end if;
+    if sqlerrm not like '%đã có chủ%' then raise exception 'T2 FAIL: lỗi lạ: %', sqlerrm; end if;
+  end;
+
+  -- ── TEST 3: tách đơn ĐÃ TÍNH tích lũy → user_id null + spend TRỪ về như cũ ──
+  perform public.admin_detach_order(v_paid, 'T3');
+  select user_id into v_uid from public.orders where id = v_paid;
+  if v_uid is not null then raise exception 'T3 FAIL: user_id chưa về null'; end if;
+  select lifetime_spend into v_spend from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 then raise exception 'T3 FAIL: spend=% mong đợi=%', v_spend, v_spend0; end if;
+
+  -- ── TEST 4: gộp LẠI sau khi tách → cộng lại đúng 1 lần (không nhân đôi) ──
+  perform public.admin_merge_guest_order(v_paid, v_cust, 'T4');
+  select lifetime_spend into v_spend from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 + v_amt then raise exception 'T4 FAIL: spend=% mong đợi=%', v_spend, v_spend0 + v_amt; end if;
+
+  -- ── TEST 5: gộp đơn PENDING → chỉ gán chủ; spend KHÔNG đổi; rpa giữ NULL ──
+  perform public.admin_merge_guest_order(v_pending, v_cust, 'T5');
+  select user_id, rewards_processed_at into v_uid, v_rpa from public.orders where id = v_pending;
+  if v_uid is distinct from v_cust then raise exception 'T5 FAIL: user_id'; end if;
+  if v_rpa is not null then raise exception 'T5 FAIL: rpa phải giữ NULL để trigger tích lũy sau'; end if;
+  select lifetime_spend into v_spend from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 + v_amt then raise exception 'T5 FAIL: spend đổi khi gộp pending'; end if;
+
+  -- ── TEST 6: đơn pending đã gộp chuyển PAID → trigger thường cộng tích lũy ──
+  update public.orders set status = 'paid' where id = v_pending;
+  select lifetime_spend into v_spend from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 + v_amt + v_amt_pend then
+    raise exception 'T6 FAIL: spend=% mong đợi=% (trigger không cộng?)', v_spend, v_spend0 + v_amt + v_amt_pend;
+  end if;
+
+  -- ── TEST 7: tách đơn vừa hoàn tất ở T6 → trừ lại đúng phần đó ──
+  perform public.admin_detach_order(v_pending, 'T7');
+  select lifetime_spend into v_spend from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 + v_amt then raise exception 'T7 FAIL: spend=% mong đợi=%', v_spend, v_spend0 + v_amt; end if;
+
+  -- ── TEST 8: admin CỘNG TAY 500k rồi KHÁCH TỰ GỘP → không mất phần cộng tay,
+  --            chỉ cộng thêm đơn done; đơn pending gộp kèm giữ rpa NULL ──
+  perform public.admin_adjust_accumulation(v_cust, v_spend0 + v_amt + 500000, 0, 'T8 cộng tay');
+  insert into public.orders (user_id, status, payment_method, payment_status, total_amount, note)
+  values (null, 'done', 'cod', 'paid', 2000000, E'Tên: TestNguoiDatDum\nSĐT: 0900000123')
+  returning id into v_tmp_done;
+  insert into public.orders (user_id, status, payment_method, payment_status, total_amount, note)
+  values (null, 'pending', 'cod', 'unpaid', 50000, E'Tên: TestNguoiDatDum\nSĐT: 0900000123')
+  returning id into v_tmp_pend;
+  -- đổi phiên sang CHÍNH KHÁCH đó (auth.uid() đọc claim "sub")
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","email":"%s","role":"authenticated"}', v_cust, coalesce(v_cust_email, 'x@y.z')), true);
+  v_cnt := public.merge_guest_orders('TestNguoiDatDum', '0900000123');
+  if v_cnt <> 2 then raise exception 'T8 FAIL: gộp được % đơn, mong đợi 2', v_cnt; end if;
+  select lifetime_spend into v_spend from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 + v_amt + 500000 + 2000000 then
+    raise exception 'T8 FAIL: spend=% mong đợi=% (mất phần cộng tay hoặc cộng sai)', v_spend, v_spend0 + v_amt + 500000 + 2000000;
+  end if;
+  select rewards_processed_at into v_rpa from public.orders where id = v_tmp_pend;
+  if v_rpa is not null then raise exception 'T8 FAIL: đơn pending tự gộp phải giữ rpa NULL'; end if;
+
+  -- ── TEST 9: vượt mốc 1tr → hạng tự lên 'silver' ──
+  select tier_code into v_tier from public.profiles where id = v_cust;
+  if v_tier <> 'silver' then raise exception 'T9 FAIL: tier=% mong đợi silver (spend>1tr)', v_tier; end if;
+
+  -- ── TEST 10: tách đơn 2tr (phiên admin) → spend tụt → hạng XUỐNG 'member' ──
+  perform set_config('request.jwt.claims', v_admin_claims, true);
+  perform public.admin_detach_order(v_tmp_done, 'T10');
+  select lifetime_spend, tier_code into v_spend, v_tier from public.profiles where id = v_cust;
+  if v_spend <> v_spend0 + v_amt + 500000 then raise exception 'T10 FAIL: spend=%', v_spend; end if;
+  if v_tier <> 'member' then raise exception 'T10 FAIL: tier=% mong đợi member (xuống hạng)', v_tier; end if;
+
+  -- ── TEST 11: tách đơn đã là vãng lai → phải bị chặn ──
+  begin
+    perform public.admin_detach_order(v_tmp_done, 'T11');
+    raise exception 'T11 FAIL: không chặn tách đơn vãng lai';
+  exception when others then
+    if sqlerrm like 'T11 FAIL%' then raise; end if;
+    if sqlerrm not like '%đã là đơn vãng lai%' then raise exception 'T11 FAIL: lỗi lạ: %', sqlerrm; end if;
+  end;
+
+  -- TẤT CẢ PASS → ném exception để ROLLBACK toàn bộ thay đổi của bộ test.
+  raise exception 'TEST_OK — 11/11 kịch bản PASS, mọi dữ liệu test đã được rollback';
+end
+$body$;
