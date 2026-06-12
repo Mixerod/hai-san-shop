@@ -1,0 +1,116 @@
+================================================================================
+  B15 — RPC ADMIN: GỘP ĐƠN VÃNG LAI THỦ CÔNG (kéo-thả trong /admin)
+        Chạy trong Supabase SQL Editor. An toàn chạy lại (create or replace).
+================================================================================
+--  KHÔNG thay thế cơ chế tự gộp B13 (merge_guest_orders — khách tự gộp ở /profile).
+--  Đây là kênh BỔ SUNG cho admin: chọn đích danh 1 đơn vãng lai → gán cho 1 khách.
+--  Tích lũy theo mô hình B14 (cộng DỒN từng đơn, không recompute tuyệt đối):
+--    • Đơn đã done/paid  → gán chủ + set rewards_processed_at (chặn phát voucher/quà
+--      hồi tố — chính sách 07 mục 6) + cộng lifetime_spend/kg ngay + tính lại hạng.
+--    • Đơn chưa hoàn tất → CHỈ gán chủ; khi đơn sang done/paid, trigger thường
+--      (process_order_rewards) sẽ tích lũy + phát thưởng như đơn bình thường.
+--  ADMIN = is_membership_admin() (B5). Mỗi lần gộp ghi 1 dòng membership_events.
+--------------------------------------------------------------------------------
+
+-- 1) Danh sách đơn vãng lai (user_id null) — phân trang + tìm theo nội dung note.
+create or replace function public.admin_list_guest_orders(
+  p_search text,
+  p_limit  int,
+  p_offset int
+) returns table (
+  id             uuid,
+  note           text,
+  total_amount   numeric,
+  status         text,
+  payment_status text,
+  created_at     timestamptz,
+  total_count    bigint
+)
+language plpgsql stable security definer set search_path = public as $$
+declare v_search text;
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  v_search := nullif(btrim(coalesce(p_search, '')), '');
+  return query
+    select o.id, o.note, o.total_amount, o.status, o.payment_status, o.created_at,
+           count(*) over() as total_count
+    from public.orders o
+    where o.user_id is null
+      and (v_search is null or o.note ilike '%' || v_search || '%')
+    order by o.created_at desc
+    limit  coalesce(nullif(p_limit, 0), 20)
+    offset coalesce(p_offset, 0);
+end;
+$$;
+
+-- 2) Gộp 1 đơn vãng lai vào 1 khách (admin chỉ định đích danh).
+create or replace function public.admin_merge_guest_order(
+  p_order  uuid,
+  p_user   uuid,
+  p_reason text
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_status text; v_amount bigint; v_kg numeric;
+  v_old text; v_new text; v_locked boolean;
+  v_actor text := coalesce(auth.email(), 'admin');
+begin
+  if not public.is_membership_admin() then
+    raise exception 'forbidden: admin only';
+  end if;
+  if not exists (select 1 from public.profiles where id = p_user) then
+    raise exception 'Không tìm thấy khách';
+  end if;
+
+  -- Khóa dòng đơn; chỉ nhận đơn CHƯA có chủ (chống gộp đôi).
+  select o.status, o.total_amount::bigint into v_status, v_amount
+  from public.orders o where o.id = p_order and o.user_id is null for update;
+  if not found then
+    raise exception 'Đơn không tồn tại hoặc đã có chủ';
+  end if;
+
+  if v_status in ('done', 'paid') then
+    -- Đơn đã hoàn tất: gán chủ + chặn thưởng hồi tố + cộng tích lũy ngay (mô hình B14).
+    update public.orders
+       set user_id = p_user,
+           rewards_processed_at = coalesce(rewards_processed_at, now())
+     where id = p_order;
+
+    v_kg := coalesce(public.calc_order_kg(p_order), 0);
+    select tier_code, tier_locked into v_old, v_locked
+    from public.profiles where id = p_user for update;
+
+    update public.profiles
+       set lifetime_spend = lifetime_spend + coalesce(v_amount, 0),
+           lifetime_kg    = lifetime_kg + v_kg
+     where id = p_user;
+
+    if not v_locked then
+      v_new := public.compute_tier(p_user);
+      if v_new is distinct from v_old then
+        update public.profiles set tier_code = v_new, tier_updated_at = now() where id = p_user;
+        insert into public.membership_events(user_id, event_type, from_tier, to_tier, actor, ref_order_id)
+        values (p_user, 'tier_recompute', v_old, v_new, v_actor, p_order);
+      end if;
+    end if;
+  else
+    -- Đơn chưa hoàn tất: chỉ gán chủ — tích lũy/thưởng đi theo luồng trigger bình thường.
+    update public.orders set user_id = p_user where id = p_order;
+  end if;
+
+  insert into public.membership_events(user_id, event_type, amount, reason, actor, ref_order_id, metadata)
+  values (
+    p_user, 'merge_guest_orders', coalesce(v_amount, 0),
+    nullif(btrim(coalesce(p_reason, '')), ''), v_actor, p_order,
+    jsonb_build_object('mode', 'admin_manual', 'order_status', v_status)
+  );
+end;
+$$;
+
+-- 3) Quyền gọi (RPC tự kiểm admin bên trong → chỉ cấp authenticated).
+grant execute on function public.admin_list_guest_orders(text,int,int)   to authenticated;
+grant execute on function public.admin_merge_guest_order(uuid,uuid,text) to authenticated;
+
+-- DONE B15. UI: /admin → Thành viên → tab "Gộp đơn vãng lai" (kéo đơn thả vào khách).

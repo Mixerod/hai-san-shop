@@ -5,17 +5,19 @@
 // "Khách hàng" (trao thủ công + audit) = B7.
 
 import { useState } from "react";
-import { Crown, Ticket, Gift, Target, Users } from "lucide-react";
+import { Crown, Ticket, Gift, Target, Users, GitMerge } from "lucide-react";
 import MembershipTiersAdmin from "@/components/MembershipTiersAdmin";
 import MembershipVouchersAdmin from "./MembershipVouchersAdmin";
 import MembershipGiftsAdmin from "./MembershipGiftsAdmin";
 import MembershipRewardRulesAdmin from "./MembershipRewardRulesAdmin";
 import MembershipCustomersAdmin from "./MembershipCustomersAdmin";
+import GuestOrderMergeAdmin from "./GuestOrderMergeAdmin";
 
-type SubTab = "tiers" | "vouchers" | "gifts" | "rules" | "customers";
+type SubTab = "tiers" | "vouchers" | "gifts" | "rules" | "customers" | "merge";
 
 const TABS: { id: SubTab; label: string; icon: typeof Crown; disabled?: boolean }[] = [
   { id: "customers", label: "Khách hàng (trao hạng)", icon: Users },
+  { id: "merge", label: "Gộp đơn vãng lai", icon: GitMerge },
   { id: "tiers", label: "Hạng thành viên", icon: Crown },
   { id: "vouchers", label: "Voucher", icon: Ticket },
   { id: "gifts", label: "Quà tặng", icon: Gift },
@@ -69,6 +71,7 @@ export default function MembershipAdmin() {
         {tab === "gifts" && <MembershipGiftsAdmin />}
         {tab === "rules" && <MembershipRewardRulesAdmin />}
         {tab === "customers" && <MembershipCustomersAdmin />}
+        {tab === "merge" && <GuestOrderMergeAdmin />}
       </div>
     </div>
   );
